@@ -1,0 +1,30 @@
+Traceback (most recent call last):
+  File "D:\fINE mNGMENT\check.py", line 4, in <module>
+    import ultralytics
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\ultralytics\__init__.py", line 5, in <module>
+    from ultralytics.models import RTDETR, SAM, YOLO
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\ultralytics\models\__init__.py", line 3, in <module>
+    from .rtdetr import RTDETR
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\ultralytics\models\rtdetr\__init__.py", line 3, in <module>
+    from .model import RTDETR
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\ultralytics\models\rtdetr\model.py", line 3, in <module>
+    from ultralytics.engine.model import Model
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\ultralytics\engine\model.py", line 8, in <module>
+    from ultralytics.cfg import TASK2DATA, get_cfg, get_save_dir
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\ultralytics\cfg\__init__.py", line 10, in <module>
+    from ultralytics.utils import (ASSETS, DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_PATH, LOGGER, RANK, ROOT, SETTINGS,
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\ultralytics\utils\__init__.py", line 21, in <module>
+    import torch
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\__init__.py", line 2204, in <module>
+    from torch import _VF as _VF, functional as functional  # usort: skip
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\functional.py", line 8, in <module>
+    import torch.nn.functional as F
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\__init__.py", line 9, in <module>
+    from torch.nn import (
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\attention\__init__.py", line 9, in <module>
+    import torch.backends.cuda
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\backends\__init__.py", line 124, in <module>
+    from torch.backends import (
+  File "C:\Users\soham\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\backends\cudnn\__init__.py", line 6, in <module>
+    from dataset import DentalDataset
+ModuleNotFoundError: No module named 'dataset'

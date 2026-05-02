@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI-Based Smart Traffic Violation Detection and Fine Management System - Automated detection, real-time fine generation, and secure payment processing.">
+    <title>E Parivahan — Smart Violation Detection & Fine Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="dark">
+    <!-- Login Page -->
+    <div id="login-page" class="login-page">
+        <div class="login-card">
+            <div class="logo" style="margin-bottom: 24px; justify-content: center;">
+                <div class="logo-icon">
+                    <img src="logo.png" alt="E Parivahan Logo" style="width: 48px; height: 48px; border-radius: 12px; object-fit: cover;">
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">E Parivahan</span>
+                </div>
+            </div>
+            <p class="login-desc" style="text-align: center; color: var(--text-muted); margin-bottom: 32px;">Sign in to access your traffic portal.</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" placeholder="e.g. admin or rahul" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Login to Dashboard</button>
+            </form>
+            <div class="demo-hints" style="margin-top: 30px; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px; font-size: 0.8125rem;">
+                <p style="color: var(--text-muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Demo Credentials:</p>
+                <p style="display: flex; justify-content: space-between;"><span>Admin:</span> <code>admin / admin123</code></p>
+                <p style="display: flex; justify-content: space-between; margin-top: 4px;"><span>User:</span> <code>rahul / rahul123</code></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Container (Hidden initially) -->
+    <div id="app-container" class="app-container hidden" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <img src="logo.png" alt="E Parivahan Logo" style="width: 54px; height: 54px; border-radius: 14px; object-fit: cover;">
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">E Parivahan</span>
+                </div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#dashboard" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span>Dashboard</span>
+            </a>
+            <a href="#detection" class="nav-item" data-page="detection" id="nav-detection" data-role="Admin">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>AI Detection</span>
+            </a>
+            <a href="#cameras" class="nav-item" data-page="cameras" id="nav-cameras" data-role="Admin">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>Cameras</span>
+            </a>
+            <a href="#owners" class="nav-item" data-page="owners" id="nav-owners" data-role="Admin">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Owners</span>
+            </a>
+            <a href="#vehicles" class="nav-item" data-page="vehicles" id="nav-vehicles">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                <span>Vehicles</span>
+            </a>
+            <a href="#violations" class="nav-item" data-page="violations" id="nav-violations">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span>Violations</span>
+            </a>
+            <a href="#fines" class="nav-item" data-page="fines" id="nav-fines">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span>Fines</span>
+            </a>
+            <a href="#payments" class="nav-item" data-page="payments" id="nav-payments">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                <span>Payments</span>
+            </a>
+
+            <div class="nav-divider"></div>
+
+            <button class="nav-item theme-toggle" id="theme-toggle">
+                <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <span>Toggle Theme</span>
+            </button>
+
+            <button class="nav-item logout-btn" id="logout-btn" style="color: var(--danger); margin-top: auto;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span>Logout</span>
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">AD</div>
+                <div class="user-info">
+                    <span class="user-name">Admin User</span>
+                    <span class="user-role">Police Dept.</span>
+                </div>
+            </div>
+            <div class="system-status">
+                <div class="status-dot"></div>
+                <span>System Online</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content" id="main-content">
+
+        <!-- ===== DASHBOARD PAGE ===== -->
+        <section class="page active" id="page-dashboard">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Real-time traffic monitoring overview</p>
+                    <div class="zigzag-divider">
+                        <svg width="100" height="12" viewBox="0 0 100 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M0 6L10 1L20 6L30 1L40 6L50 1L60 6L70 1L80 6L90 1L100 6" stroke="var(--accent-main)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <span class="pulse-indicator"></span>
+                    <span style="font-weight: 600; font-size: 0.8125rem; letter-spacing: 0.05em; color: var(--text-muted);">LIVE</span>
+                </div>
+            </div>
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card stat-card--violations">
+                    <div class="stat-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-violations">0</span>
+                        <span class="stat-label">Total Violations</span>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--fines">
+                    <div class="stat-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-fines-collected">₹0</span>
+                        <span class="stat-label">Fines Collected</span>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--pending">
+                    <div class="stat-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-pending">₹0</span>
+                        <span class="stat-label">Pending Fines</span>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--cameras">
+                    <div class="stat-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-cameras">0</span>
+                        <span class="stat-label">Active Cameras</span>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-grid">
+                <div class="card recent-violations-card">
+                    <div class="card-header">
+                        <h2>Recent Violations</h2>
+                        <a href="#violations" class="view-all-link">View All →</a>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table" id="dashboard-violations-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Vehicle</th>
+                                    <th>Type</th>
+                                    <th>Camera</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-violations-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card violation-chart-card">
+                    <div class="card-header">
+                        <h2>Violation Types</h2>
+                    </div>
+                    <div class="chart-area" id="violation-chart"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== AI DETECTION PAGE ===== -->
+        <section class="page" id="page-detection">
+            <div class="page-header">
+                <div>
+                    <h1>AI Video Detection</h1>
+                    <p class="page-subtitle">Upload traffic footage for real-time YOLOv8 violation analysis</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary hidden" id="btn-start-detection">
+                        Simulation Mode (Legacy)
+                    </button>
+                </div>
+            </div>
+            
+            <div class="detection-dashboard">
+                <!-- Upload Zone -->
+                <div class="upload-card card" id="upload-zone">
+                    <div class="upload-content">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: #6366f1; margin-bottom: 1rem;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <h3>Upload Traffic Video</h3>
+                        <p class="text-muted">Drag & drop an MP4 file here or click to browse</p>
+                        <input type="file" id="video-upload-input" accept="video/mp4,video/x-m4v,video/*" class="hidden">
+                        <button class="btn btn-outline" style="margin-top: 1rem;" onclick="document.getElementById('video-upload-input').click()">Select File</button>
+                    </div>
+                    <div class="upload-progress hidden" id="upload-progress">
+                        <h4 id="progress-text">Uploading...</h4>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detection-grid hidden" id="video-results-grid">
+                    <!-- Video Player -->
+                    <div class="video-container card">
+                        <div class="card-header">
+                            <h2>Processed Footage</h2>
+                            <span class="badge badge-success">YOLOv8 Active</span>
+                        </div>
+                        <video id="processed-video-player" controls autoplay style="width: 100%; border-radius: 8px; background: #000;"></video>
+                    </div>
+
+                    <!-- Detection Results -->
+                    <div class="detection-log-panel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Detected Violations</h2>
+                                <span class="badge badge-info" id="real-detection-count">0 detections</span>
+                            </div>
+                            <div class="detection-log-list" id="real-detection-list" style="max-height: 400px; overflow-y: auto;">
+                                <!-- Detections populated here -->
+                            </div>
+                        </div>
+                        <div class="card detection-stats-card" style="margin-top: 1rem;">
+                            <div class="card-header"><h2>Processing Summary</h2></div>
+                            <div class="mini-stats">
+                                <div class="mini-stat">
+                                    <span class="mini-stat-value" id="res-violations">0</span>
+                                    <span class="mini-stat-label">Violations</span>
+                                </div>
+                                <div class="mini-stat">
+                                    <span class="mini-stat-value" id="res-fines">₹0</span>
+                                    <span class="mini-stat-label">Total Fines</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CAMERAS PAGE ===== -->
+        <section class="page" id="page-cameras">
+            <div class="page-header">
+                <div>
+                    <h1>Camera Management</h1>
+                    <p class="page-subtitle">Manage AI-enabled traffic surveillance cameras</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-add-camera">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add Camera
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table class="data-table" id="cameras-table">
+                        <thead>
+                            <tr>
+                                <th>Camera ID</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cameras-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== OWNERS PAGE ===== -->
+        <section class="page" id="page-owners">
+            <div class="page-header">
+                <div>
+                    <h1>Owner Management</h1>
+                    <p class="page-subtitle">Manage vehicle owner records and license details</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-add-owner">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add Owner
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table class="data-table" id="owners-table">
+                        <thead>
+                            <tr>
+                                <th>Owner ID</th>
+                                <th>Name</th>
+                                <th>License No</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="owners-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== VEHICLES PAGE ===== -->
+        <section class="page" id="page-vehicles">
+            <div class="page-header">
+                <div>
+                    <h1>Vehicle Management</h1>
+                    <p class="page-subtitle">Track registered vehicles linked to owners</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-add-vehicle">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add Vehicle
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table class="data-table" id="vehicles-table">
+                        <thead>
+                            <tr>
+                                <th>Vehicle ID</th>
+                                <th>Registration No</th>
+                                <th>Type</th>
+                                <th>Color</th>
+                                <th>Owner</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vehicles-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== VIOLATIONS PAGE ===== -->
+        <section class="page" id="page-violations">
+            <div class="page-header">
+                <div>
+                    <h1>Violation Records</h1>
+                    <p class="page-subtitle">All detected traffic violations</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-add-violation">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Log Violation
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table class="data-table" id="violations-table">
+                        <thead>
+                            <tr>
+                                <th>Violation ID</th>
+                                <th>Vehicle</th>
+                                <th>Camera</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Fine Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="violations-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== FINES PAGE ===== -->
+        <section class="page" id="page-fines">
+            <div class="page-header">
+                <div>
+                    <h1>Fine Management</h1>
+                    <p class="page-subtitle">Track and manage violation fines</p>
+                </div>
+                <div class="header-actions">
+                    <select class="filter-select" id="fine-status-filter">
+                        <option value="all">All Fines</option>
+                        <option value="Unpaid">Unpaid</option>
+                        <option value="Paid">Paid</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table class="data-table" id="fines-table">
+                        <thead>
+                            <tr>
+                                <th>Fine ID</th>
+                                <th>Violation ID</th>
+                                <th>Vehicle</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fines-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PAYMENTS PAGE ===== -->
+        <section class="page" id="page-payments">
+            <div class="page-header">
+                <div>
+                    <h1>Payment Records</h1>
+                    <p class="page-subtitle">Track all fine payments and transaction details</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-add-payment">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Record Payment
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table class="data-table" id="payments-table">
+                        <thead>
+                            <tr>
+                                <th>Payment ID</th>
+                                <th>Fine ID</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                                <th>Mode</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payments-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Add Record</h2>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <form id="modal-form">
+                <div class="modal-body" id="modal-body"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="modal-submit">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="app.js"></script>
+    </div> <!-- End App Container -->
+</body>
+</html>
