@@ -67,8 +67,17 @@ const REMINDERS_OPTS_KEY = 'trafficai-reminders-opts';
 const DailyReminders = {
     selectedDate: null,
     showDone: false,
+    _inited: false,
+
+    tryInit() {
+        const u = Auth.getUser();
+        if (!u || u.role === 'Admin' || this._inited) return;
+        this.init();
+    },
 
     init() {
+        if (this._inited) return;
+        if (Auth.getUser()?.role === 'Admin') return;
         this.weekEl = document.getElementById('reminders-week');
         this.listEl = document.getElementById('reminders-list');
         this.inputEl = document.getElementById('reminder-text-input');
@@ -120,6 +129,7 @@ const DailyReminders = {
 
         this.renderWeek();
         this.renderList();
+        this._inited = true;
     },
 
     load() {
@@ -320,6 +330,8 @@ const Auth = {
             document.querySelector('.user-role').textContent = user.role === 'Admin' ? 'Administrator' : 'Vehicle Owner';
             document.querySelector('.avatar').textContent = user.username.substring(0, 2).toUpperCase();
 
+            syncSidebarStatLabels(user.role === 'Admin');
+
             // Restricted menu items
             document.querySelectorAll('.nav-item[data-role="Admin"]').forEach(item => {
                 item.style.display = user.role === 'Admin' ? 'flex' : 'none';
@@ -328,6 +340,7 @@ const Auth = {
             appContainer.style.display = 'none';
             loginPage.style.display = 'flex';
         }
+        syncDashboardRoleWidgets(user);
     }
 };
 
@@ -413,6 +426,146 @@ const Modal = {
 };
 
 // ============================================
+// Admin dashboard: live city map (fine / violation hotspots)
+// ============================================
+const AdminFineMap = {
+    map: null,
+    heatLayer: null,
+    markersLayer: null,
+    pollTimer: null,
+    _scheduled: false,
+
+    scheduleInit() {
+        if (Auth.getUser()?.role !== 'Admin') return;
+        const run = () => {
+            this._scheduled = false;
+            if (!document.getElementById('leaflet-fine-map')) return;
+            if (typeof L === 'undefined') return;
+            if (!this.map) this._createMap();
+            this.refresh();
+            this.invalidate();
+        };
+        if (this._scheduled) return;
+        this._scheduled = true;
+        requestAnimationFrame(() => setTimeout(run, 150));
+    },
+
+    _createMap() {
+        const el = document.getElementById('leaflet-fine-map');
+        if (!el || this.map) return;
+        const [lat, lng] = [12.9716, 77.5946];
+        this.map = L.map(el, { scrollWheelZoom: true }).setView([lat, lng], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19,
+        }).addTo(this.map);
+        this.markersLayer = L.layerGroup().addTo(this.map);
+        this.map.whenReady(() => this.map.invalidateSize());
+        if (this.pollTimer) clearInterval(this.pollTimer);
+        this.pollTimer = setInterval(() => {
+            const page = (location.hash || '#dashboard').replace(/^#/, '') || 'dashboard';
+            if (Auth.getUser()?.role === 'Admin' && page === 'dashboard') this.refresh();
+        }, 30000);
+    },
+
+    invalidate() {
+        if (this.map) setTimeout(() => this.map.invalidateSize(), 200);
+    },
+
+    async refresh() {
+        if (!this.map || Auth.getUser()?.role !== 'Admin') return;
+        try {
+            const res = await fetch(`${API}/map/hotspots`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (!data.ok || !data.points) return;
+            const city = data.city || {};
+            if (city.center && Array.isArray(city.center)) {
+                this.map.setView(city.center, city.defaultZoom || 12);
+            }
+            this.markersLayer.clearLayers();
+            if (this.heatLayer) {
+                this.map.removeLayer(this.heatLayer);
+                this.heatLayer = null;
+            }
+            const heatPts = [];
+            data.points.forEach((p) => {
+                const intensity = Math.max(0.12, p.heat || 0);
+                heatPts.push([p.lat, p.lng, intensity]);
+            });
+            if (typeof L.heatLayer === 'function' && heatPts.length) {
+                this.heatLayer = L.heatLayer(heatPts, {
+                    radius: 42,
+                    blur: 22,
+                    maxZoom: 17,
+                    max: 1.0,
+                    gradient: { 0.35: '#4b39b5', 0.6: '#ff5f6d', 1: '#ff2d43' },
+                });
+                this.heatLayer.addTo(this.map);
+            }
+            data.points.forEach((p) => {
+                const r = 6 + Math.min(28, (p.violations || 0) * 4);
+                const circle = L.circleMarker([p.lat, p.lng], {
+                    radius: r,
+                    color: '#ff5f6d',
+                    fillColor: '#4b39b5',
+                    fillOpacity: 0.28,
+                    weight: 2,
+                });
+                const pending = Number(p.pendingAmount || 0).toLocaleString('en-IN');
+                circle.bindPopup(
+                    `<strong>${escapeHtml(p.location)}</strong><br/>` +
+                    `Violations: ${p.violations}<br/>` +
+                    `Fines recorded: ${p.finesTotal}<br/>` +
+                    `Unpaid fines: ${p.finesUnpaid} (₹${pending})`
+                );
+                circle.addTo(this.markersLayer);
+            });
+            if (this.markersLayer.bringToFront) this.markersLayer.bringToFront();
+            const updatedEl = document.getElementById('admin-map-updated');
+            if (updatedEl) updatedEl.textContent = new Date().toLocaleTimeString();
+        } catch (e) {
+            console.error('Map refresh failed', e);
+        }
+    },
+
+    teardown() {
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+        }
+        if (this.heatLayer && this.map) {
+            this.map.removeLayer(this.heatLayer);
+            this.heatLayer = null;
+        }
+        if (this.map) {
+            this.map.remove();
+            this.map = null;
+        }
+        this.markersLayer = null;
+        this._scheduled = false;
+    },
+};
+
+function syncDashboardRoleWidgets(user) {
+    const isAdmin = !!(user && user.role === 'Admin');
+    document.querySelectorAll('.dashboard-user-only').forEach((el) => {
+        el.classList.toggle('hidden', isAdmin);
+    });
+    document.querySelectorAll('.dashboard-admin-only').forEach((el) => {
+        el.classList.toggle('hidden', !isAdmin);
+    });
+    if (!isAdmin) {
+        DailyReminders.tryInit();
+    }
+    if (isAdmin) {
+        AdminFineMap.scheduleInit();
+    } else {
+        AdminFineMap.teardown();
+    }
+}
+
+// ============================================
 // Router (Hash-based SPA)
 // ============================================
 const pages = ['dashboard', 'detection', 'cameras', 'owners', 'vehicles', 'violations', 'fines', 'payments'];
@@ -461,22 +614,102 @@ function renderPage(page) {
     }
 }
 
+function syncSidebarStatLabels(isAdmin) {
+    const aL = document.getElementById('sidebar-stat-a-label');
+    const bL = document.getElementById('sidebar-stat-b-label');
+    if (!aL || !bL) return;
+    if (isAdmin) {
+        aL.textContent = 'Registered owners';
+        bL.textContent = 'Registered vehicles';
+    } else {
+        aL.textContent = 'Violations';
+        bL.textContent = 'Pending';
+    }
+}
+
+function applyDashboardMosaicLayout(isAdmin, stats) {
+    const lt = document.getElementById('mosaic-dash-left-title');
+    const ls = document.getElementById('mosaic-dash-left-sub');
+    const rt = document.getElementById('mosaic-dash-right-title');
+    const rs = document.getElementById('mosaic-dash-right-sub');
+    const lsuf = document.getElementById('mosaic-dash-left-suffix');
+    const rsuf = document.getElementById('mosaic-dash-right-suffix');
+    const leftTags = document.getElementById('mosaic-dash-left-tags');
+    const rightTags = document.getElementById('mosaic-dash-right-tags');
+    const elCam = document.getElementById('stat-cameras');
+    const elVio = document.getElementById('stat-violations');
+    if (!lt || !ls || !rt || !rs || !lsuf || !rsuf || !elCam || !elVio) return;
+
+    if (isAdmin) {
+        lt.textContent = 'Registered owners';
+        ls.textContent = 'In the system';
+        rt.textContent = 'Registered vehicles';
+        rs.textContent = 'Linked to owners';
+        elCam.textContent = stats.registeredOwners ?? 0;
+        elVio.textContent = stats.registeredVehicles ?? 0;
+        lsuf.textContent = 'owners';
+        rsuf.textContent = 'vehicles';
+        if (leftTags) {
+            leftTags.innerHTML =
+                '<span class="mosaic-tag mosaic-tag--purple">People</span><span class="mosaic-tag">KYC</span><span class="mosaic-tag mosaic-tag--purple">ID</span>';
+        }
+        if (rightTags) {
+            rightTags.innerHTML =
+                '<span class="mosaic-tag mosaic-tag--purple">RC</span><span class="mosaic-tag">Fleet</span><span class="mosaic-tag mosaic-tag--purple">Reg</span>';
+        }
+    } else {
+        lt.textContent = 'Live cameras';
+        ls.textContent = 'Surveillance grid';
+        rt.textContent = 'Violations';
+        rs.textContent = 'All-time records';
+        elCam.textContent = stats.totalCameras;
+        elVio.textContent = stats.totalViolations;
+        lsuf.textContent = 'active';
+        rsuf.textContent = 'total';
+        if (leftTags) {
+            leftTags.innerHTML =
+                '<span class="mosaic-tag mosaic-tag--purple">AI</span><span class="mosaic-tag">YOLO</span><span class="mosaic-tag mosaic-tag--purple">HD</span>';
+        }
+        if (rightTags) {
+            rightTags.innerHTML =
+                '<span class="mosaic-tag mosaic-tag--purple">Signal</span><span class="mosaic-tag">Speed</span><span class="mosaic-tag">Parking</span>';
+        }
+    }
+}
+
 // ============================================
 // DASHBOARD
 // ============================================
 async function renderDashboard() {
     try {
         const stats = await api('/stats');
+        const user = Auth.getUser();
+        const isAdmin = !!(user && user.role === 'Admin');
 
-        document.getElementById('stat-violations').textContent = stats.totalViolations;
-        document.getElementById('stat-fines-collected').textContent = formatCurrency(stats.finesCollected);
+        syncSidebarStatLabels(isAdmin);
+        applyDashboardMosaicLayout(isAdmin, stats);
+
+        const revenueLabel = document.getElementById('stat-fines-collected-label');
+        const revenueValue = document.getElementById('stat-fines-collected');
+        if (isAdmin) {
+            if (revenueLabel) revenueLabel.textContent = 'Fines collected';
+            if (revenueValue) revenueValue.textContent = formatCurrency(stats.finesCollected);
+        } else {
+            if (revenueLabel) revenueLabel.textContent = 'Pending fines';
+            if (revenueValue) revenueValue.textContent = formatCurrency(stats.pendingFines);
+        }
+
         document.getElementById('stat-pending').textContent = formatCurrency(stats.pendingFines);
-        document.getElementById('stat-cameras').textContent = stats.totalCameras;
 
-        const sbV = document.getElementById('sidebar-stat-violations');
-        const sbC = document.getElementById('sidebar-stat-collected');
-        if (sbV) sbV.textContent = stats.totalViolations;
-        if (sbC) sbC.textContent = formatCurrency(stats.finesCollected);
+        const sbA = document.getElementById('sidebar-stat-a-value');
+        const sbB = document.getElementById('sidebar-stat-b-value');
+        if (isAdmin) {
+            if (sbA) sbA.textContent = stats.registeredOwners ?? 0;
+            if (sbB) sbB.textContent = stats.registeredVehicles ?? 0;
+        } else {
+            if (sbA) sbA.textContent = stats.totalViolations;
+            if (sbB) sbB.textContent = formatCurrency(stats.pendingFines);
+        }
 
         const totalMoney = Number(stats.finesCollected) + Number(stats.pendingFines);
         const collectionPct = totalMoney > 0
@@ -499,7 +732,6 @@ async function renderDashboard() {
                 : `${collectionPct}% of collected + pending total`;
         }
 
-        const user = Auth.getUser();
         const greet = document.getElementById('balance-greeting-name');
         if (user && greet) greet.textContent = user.username;
         const roleLbl = document.getElementById('dashboard-user-role-label');
@@ -526,6 +758,10 @@ async function renderDashboard() {
 
         // Chart
         renderViolationChart(stats.violationTypes || []);
+
+        if (isAdmin) {
+            AdminFineMap.scheduleInit();
+        }
     } catch (err) {
         console.error('Dashboard error:', err);
         showToast('Failed to load dashboard. Is the server running?', 'error');
@@ -832,10 +1068,24 @@ document.getElementById('btn-add-violation').addEventListener('click', async () 
 // ============================================
 async function renderFines(filter) {
     try {
+        const user = Auth.getUser();
+        const filterEl = document.getElementById('fine-status-filter');
+        const isOwner = user && user.role !== 'Admin';
+
         if (!filter) {
-            const filterEl = document.getElementById('fine-status-filter');
             filter = filterEl ? filterEl.value : 'all';
         }
+
+        if (isOwner) {
+            filter = 'Unpaid';
+            if (filterEl) {
+                filterEl.value = 'Unpaid';
+                filterEl.disabled = true;
+            }
+        } else if (filterEl) {
+            filterEl.disabled = false;
+        }
+
         const endpoint = filter !== 'all' ? `/fines?status=${filter}` : '/fines';
         const fines = await api(endpoint);
         const tbody = document.getElementById('fines-body');
@@ -1102,7 +1352,6 @@ document.addEventListener('DOMContentLoaded', () => {
     Modal.init();
     Theme.init();
     Auth.init();
-    DailyReminders.init();
 
     function onHashChange() {
         const hash = location.hash.replace('#', '') || 'dashboard';

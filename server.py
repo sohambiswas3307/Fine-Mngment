@@ -25,6 +25,16 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'trafficai.db')
 
+# Demo map coordinates (Bengaluru metro–style layout for fine / traffic hotspot UI)
+CAMERA_COORDS = {
+    'CAM-001': (12.9756, 77.6074),
+    'CAM-002': (12.9352, 77.6245),
+    'CAM-003': (12.9719, 77.5946),
+    'CAM-004': (12.9901, 77.5734),
+    'CAM-005': (12.9468, 77.6062),
+}
+CITY_MAP_DEFAULT = {'name': 'City operations', 'center': [12.9716, 77.5946], 'defaultZoom': 12}
+
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 PROCESSED_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'processed')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -95,7 +105,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS cameras (
             camera_id TEXT PRIMARY KEY,
             location TEXT NOT NULL,
-            status TEXT DEFAULT 'Active'
+            status TEXT DEFAULT 'Active',
+            latitude REAL,
+            longitude REAL
         );
 
         CREATE TABLE IF NOT EXISTS owners (
@@ -156,6 +168,27 @@ def init_db():
     conn.close()
 
 
+def migrate_schema():
+    """Add camera coordinates for map features; backfill demo pins."""
+    conn = get_db()
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(cameras)").fetchall()]
+        if 'latitude' not in cols:
+            conn.execute("ALTER TABLE cameras ADD COLUMN latitude REAL")
+        if 'longitude' not in cols:
+            conn.execute("ALTER TABLE cameras ADD COLUMN longitude REAL")
+        conn.commit()
+        for cam_id, (lat, lng) in CAMERA_COORDS.items():
+            conn.execute(
+                """UPDATE cameras SET latitude = COALESCE(latitude, ?), longitude = COALESCE(longitude, ?)
+                   WHERE camera_id = ?""",
+                (lat, lng, cam_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def seed_data():
     """Insert demo data if tables are empty."""
     conn = get_db()
@@ -165,13 +198,17 @@ def seed_data():
         return
 
     # Cameras
-    conn.executemany("INSERT INTO cameras VALUES (?, ?, ?)", [
-        ('CAM-001', 'MG Road Junction', 'Active'),
-        ('CAM-002', 'Highway Toll Plaza', 'Active'),
-        ('CAM-003', 'City Center Signal', 'Active'),
-        ('CAM-004', 'Ring Road Flyover', 'Active'),
-        ('CAM-005', 'School Zone - Park Street', 'Active'),
-    ])
+    cam_rows = [
+        ('CAM-001', 'MG Road Junction', 'Active', *CAMERA_COORDS['CAM-001']),
+        ('CAM-002', 'Highway Toll Plaza', 'Active', *CAMERA_COORDS['CAM-002']),
+        ('CAM-003', 'City Center Signal', 'Active', *CAMERA_COORDS['CAM-003']),
+        ('CAM-004', 'Ring Road Flyover', 'Active', *CAMERA_COORDS['CAM-004']),
+        ('CAM-005', 'School Zone - Park Street', 'Active', *CAMERA_COORDS['CAM-005']),
+    ]
+    conn.executemany(
+        "INSERT INTO cameras (camera_id, location, status, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
+        cam_rows,
+    )
 
     # Owners
     conn.executemany("INSERT INTO owners VALUES (?, ?, ?, ?, ?)", [
@@ -289,13 +326,7 @@ def get_stats():
         
         total_cameras = conn.execute("SELECT COUNT(*) FROM cameras WHERE status = 'Active'").fetchone()[0]
         
-        collected = conn.execute("""
-            SELECT COALESCE(SUM(p.amount), 0) FROM payments p
-            JOIN fines f ON p.fine_id = f.fine_id
-            JOIN violations v ON f.violation_id = v.violation_id
-            JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
-            WHERE veh.owner_id = ?
-        """, (owner_id,)).fetchone()[0]
+        collected = 0
         
         pending = conn.execute("""
             SELECT COALESCE(SUM(f.amount), 0) FROM fines f
@@ -325,6 +356,11 @@ def get_stats():
             WHERE veh.owner_id = ?
             GROUP BY v.type ORDER BY count DESC
         """, (owner_id,)).fetchall())
+
+        registered_owners = None
+        registered_vehicles = conn.execute(
+            "SELECT COUNT(*) FROM vehicles WHERE owner_id = ?", (owner_id,)
+        ).fetchone()[0]
         
     else:
         # Admin global stats
@@ -332,6 +368,8 @@ def get_stats():
         total_cameras = conn.execute("SELECT COUNT(*) FROM cameras").fetchone()[0]
         collected = conn.execute("SELECT COALESCE(SUM(amount), 0) FROM payments").fetchone()[0]
         pending = conn.execute("SELECT COALESCE(SUM(amount), 0) FROM fines WHERE status = 'Unpaid'").fetchone()[0]
+        registered_owners = conn.execute("SELECT COUNT(*) FROM owners").fetchone()[0]
+        registered_vehicles = conn.execute("SELECT COUNT(*) FROM vehicles").fetchone()[0]
 
         recent = conn.execute("""
             SELECT v.violation_id, v.type, v.date, v.confidence,
@@ -351,14 +389,67 @@ def get_stats():
         ).fetchall())
 
     conn.close()
-    return jsonify({
+    payload = {
         'totalViolations': total_violations,
         'totalCameras': total_cameras,
         'finesCollected': collected,
         'pendingFines': pending,
         'recentViolations': dict_rows(recent),
         'violationTypes': type_counts,
-    })
+        'registeredVehicles': registered_vehicles,
+    }
+    if registered_owners is not None:
+        payload['registeredOwners'] = registered_owners
+    return jsonify(payload)
+
+
+@app.route('/api/map/hotspots')
+def map_hotspots():
+    """Admin dashboard: camera locations with violation / fine density for live map."""
+    if request.args.get('owner_id'):
+        return jsonify({'ok': False, 'message': 'Admin only'}), 403
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT c.camera_id, c.location, c.latitude, c.longitude, c.status,
+            (SELECT COUNT(*) FROM violations v WHERE v.camera_id = c.camera_id) AS violations,
+            (SELECT COUNT(*) FROM violations v
+             JOIN fines f ON f.violation_id = v.violation_id WHERE v.camera_id = c.camera_id) AS fines_total,
+            (SELECT COUNT(*) FROM violations v
+             JOIN fines f ON f.violation_id = v.violation_id
+             WHERE v.camera_id = c.camera_id AND f.status = 'Unpaid') AS fines_unpaid,
+            (SELECT IFNULL(SUM(f.amount), 0) FROM violations v
+             JOIN fines f ON f.violation_id = v.violation_id
+             WHERE v.camera_id = c.camera_id AND f.status = 'Unpaid') AS pending_amount
+        FROM cameras c
+        ORDER BY violations DESC, c.camera_id
+    """).fetchall()
+    conn.close()
+
+    center_lat, center_lng = CITY_MAP_DEFAULT['center']
+    rows_list = [dict(r) for r in rows]
+    max_v = max((int(d['violations'] or 0) for d in rows_list), default=1)
+    points = []
+    for d in rows_list:
+        vct = int(d['violations'] or 0)
+        lat, lng = d.get('latitude'), d.get('longitude')
+        if lat is None or lng is None:
+            h = sum(ord(c) * (i + 1) for i, c in enumerate(d['camera_id']))
+            lat = center_lat + (h % 17 - 8) * 0.0022
+            lng = center_lng + (h % 13 - 6) * 0.0022
+        points.append({
+            'cameraId': d['camera_id'],
+            'location': d['location'],
+            'lat': float(lat),
+            'lng': float(lng),
+            'status': d['status'],
+            'violations': vct,
+            'finesTotal': int(d['fines_total'] or 0),
+            'finesUnpaid': int(d['fines_unpaid'] or 0),
+            'pendingAmount': float(d['pending_amount'] or 0),
+            'heat': round(vct / max_v, 4) if max_v else 0,
+        })
+
+    return jsonify({'ok': True, 'city': CITY_MAP_DEFAULT, 'points': points, 'updatedAt': time.time()})
 
 
 # ============================================
@@ -378,8 +469,11 @@ def create_camera():
     data = request.json
     cam_id = next_id('cameras', 'CAM')
     conn = get_db()
-    conn.execute("INSERT INTO cameras VALUES (?, ?, ?)",
-                 (cam_id, data['location'], data.get('status', 'Active')))
+    conn.execute(
+        "INSERT INTO cameras (camera_id, location, status, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
+        (cam_id, data['location'], data.get('status', 'Active'),
+         data.get('latitude'), data.get('longitude')),
+    )
     conn.commit()
     conn.close()
     return jsonify({'id': cam_id, 'message': 'Camera added'}), 201
@@ -389,8 +483,11 @@ def create_camera():
 def update_camera(cam_id):
     data = request.json
     conn = get_db()
-    conn.execute("UPDATE cameras SET location=?, status=? WHERE camera_id=?",
-                 (data['location'], data.get('status', 'Active'), cam_id))
+    conn.execute(
+        "UPDATE cameras SET location=?, status=?, latitude=?, longitude=? WHERE camera_id=?",
+        (data['location'], data.get('status', 'Active'),
+         data.get('latitude'), data.get('longitude'), cam_id),
+    )
     conn.commit()
     conn.close()
     return jsonify({'message': 'Camera updated'})
@@ -596,13 +693,14 @@ def list_fines():
         WHERE 1=1
     """
     params = []
-    if status_filter != 'all':
-        query += " AND f.status = ?"
-        params.append(status_filter)
     if owner_id:
+        query += " AND f.status = 'Unpaid'"
         query += " AND veh.owner_id = ?"
         params.append(owner_id)
-        
+    elif status_filter != 'all':
+        query += " AND f.status = ?"
+        params.append(status_filter)
+
     query += " ORDER BY f.fine_id DESC"
     rows = conn.execute(query, params).fetchall()
     conn.close()
@@ -615,8 +713,19 @@ def list_fines():
 
 @app.route('/api/payments', methods=['GET'])
 def list_payments():
+    owner_id = request.args.get('owner_id')
     conn = get_db()
-    rows = conn.execute("SELECT * FROM payments ORDER BY date DESC, payment_id DESC").fetchall()
+    if owner_id:
+        rows = conn.execute("""
+            SELECT p.* FROM payments p
+            JOIN fines f ON p.fine_id = f.fine_id
+            JOIN violations v ON f.violation_id = v.violation_id
+            JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
+            WHERE veh.owner_id = ?
+            ORDER BY p.date DESC, p.payment_id DESC
+        """, (owner_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM payments ORDER BY date DESC, payment_id DESC").fetchall()
     conn.close()
     return jsonify(dict_rows(rows))
 
@@ -922,15 +1031,21 @@ def serve_video(type, filename):
 
 @app.route('/api/fines/unpaid', methods=['GET'])
 def list_unpaid_fines():
+    owner_id = request.args.get('owner_id')
     conn = get_db()
-    rows = conn.execute("""
+    query = """
         SELECT f.*, v.type as violation_type, veh.reg_no as vehicle_reg
         FROM fines f
         LEFT JOIN violations v ON f.violation_id = v.violation_id
         LEFT JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
         WHERE f.status = 'Unpaid'
-        ORDER BY f.fine_id
-    """).fetchall()
+    """
+    params = []
+    if owner_id:
+        query += " AND veh.owner_id = ?"
+        params.append(owner_id)
+    query += " ORDER BY f.fine_id"
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return jsonify(dict_rows(rows))
 
@@ -944,6 +1059,7 @@ if __name__ == '__main__':
     print("  TrafficAI — Smart Violation Detection System")
     print("=" * 50)
     init_db()
+    migrate_schema()
     seed_data()
     print(f"✓ Database: {DB_PATH}")
     print(f"✓ Server starting at http://localhost:5000")

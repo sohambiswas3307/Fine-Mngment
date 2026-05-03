@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body data-theme="dark">
@@ -68,12 +69,12 @@
             </div>
             <div class="sidebar-profile-stats">
                 <div class="sidebar-profile-stat">
-                    <span class="sidebar-profile-stat-value" id="sidebar-stat-violations">0</span>
-                    <span class="sidebar-profile-stat-label">Violations</span>
+                    <span class="sidebar-profile-stat-value" id="sidebar-stat-a-value">0</span>
+                    <span class="sidebar-profile-stat-label" id="sidebar-stat-a-label">Registered owners</span>
                 </div>
                 <div class="sidebar-profile-stat">
-                    <span class="sidebar-profile-stat-value" id="sidebar-stat-collected">₹0</span>
-                    <span class="sidebar-profile-stat-label">Collected</span>
+                    <span class="sidebar-profile-stat-value" id="sidebar-stat-b-value">0</span>
+                    <span class="sidebar-profile-stat-label" id="sidebar-stat-b-label">Registered vehicles</span>
                 </div>
             </div>
         </div>
@@ -103,7 +104,7 @@
                 <span>Violations</span>
             </a>
             <a href="#fines" class="nav-item" data-page="fines" id="nav-fines">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <svg class="icon-rupee" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17" font-size="15" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
                 <span>Fines</span>
             </a>
             <a href="#payments" class="nav-item" data-page="payments" id="nav-payments">
@@ -135,10 +136,10 @@
                 <div class="dashboard-mosaic-mid">
                     <div class="mosaic-card mosaic-revenue">
                         <div class="mosaic-revenue-icon" aria-hidden="true">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                            <svg class="icon-rupee icon-rupee--lg" width="22" height="22" viewBox="0 0 24 24"><text x="12" y="17.5" font-size="16" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
                         </div>
                         <div class="mosaic-revenue-body">
-                            <span class="mosaic-revenue-label">Fines collected</span>
+                            <span class="mosaic-revenue-label" id="stat-fines-collected-label">Fines collected</span>
                             <span class="mosaic-revenue-value" id="stat-fines-collected">₹0</span>
                             <div class="mosaic-progress-track">
                                 <div class="mosaic-progress-fill" id="dashboard-collection-bar" style="width: 0%"></div>
@@ -147,33 +148,33 @@
                     </div>
                     <div class="mosaic-pair">
                         <div class="mosaic-card mosaic-spot">
-                            <h3 class="mosaic-spot-title">Live cameras</h3>
-                            <p class="mosaic-spot-sub">Surveillance grid</p>
-                            <div class="mosaic-avatars" aria-hidden="true">
+                            <h3 class="mosaic-spot-title" id="mosaic-dash-left-title">Registered owners</h3>
+                            <p class="mosaic-spot-sub" id="mosaic-dash-left-sub">In the system</p>
+                            <div class="mosaic-avatars" id="mosaic-dash-left-avatars" aria-hidden="true">
                                 <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
                             </div>
-                            <div class="mosaic-tags">
-                                <span class="mosaic-tag mosaic-tag--purple">AI</span>
-                                <span class="mosaic-tag">YOLO</span>
-                                <span class="mosaic-tag mosaic-tag--purple">HD</span>
+                            <div class="mosaic-tags" id="mosaic-dash-left-tags">
+                                <span class="mosaic-tag mosaic-tag--purple">People</span>
+                                <span class="mosaic-tag">KYC</span>
+                                <span class="mosaic-tag mosaic-tag--purple">ID</span>
                             </div>
-                            <p class="mosaic-spot-metric"><span id="stat-cameras">0</span> active</p>
+                            <p class="mosaic-spot-metric"><span id="stat-cameras">0</span> <span id="mosaic-dash-left-suffix">owners</span></p>
                         </div>
                         <div class="mosaic-card mosaic-spot">
-                            <h3 class="mosaic-spot-title">Violations</h3>
-                            <p class="mosaic-spot-sub">All-time records</p>
-                            <div class="mosaic-avatars" aria-hidden="true">
+                            <h3 class="mosaic-spot-title" id="mosaic-dash-right-title">Registered vehicles</h3>
+                            <p class="mosaic-spot-sub" id="mosaic-dash-right-sub">Linked to owners</p>
+                            <div class="mosaic-avatars" id="mosaic-dash-right-avatars" aria-hidden="true">
                                 <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
                             </div>
-                            <div class="mosaic-tags">
-                                <span class="mosaic-tag mosaic-tag--purple">Signal</span>
-                                <span class="mosaic-tag">Speed</span>
-                                <span class="mosaic-tag">Parking</span>
+                            <div class="mosaic-tags" id="mosaic-dash-right-tags">
+                                <span class="mosaic-tag mosaic-tag--purple">RC</span>
+                                <span class="mosaic-tag">Fleet</span>
+                                <span class="mosaic-tag mosaic-tag--purple">Reg</span>
                             </div>
-                            <p class="mosaic-spot-metric"><span id="stat-violations">0</span> total</p>
+                            <p class="mosaic-spot-metric"><span id="stat-violations">0</span> <span id="mosaic-dash-right-suffix">vehicles</span></p>
                         </div>
                     </div>
-                    <div class="mosaic-card mosaic-reminders" id="daily-reminders-card">
+                    <div class="mosaic-card mosaic-reminders dashboard-user-only" id="daily-reminders-card">
                         <div class="mosaic-calendar-head">
                             <span class="mosaic-calendar-title">Daily reminders</span>
                             <button type="button" class="mosaic-toggle" id="reminders-show-done-toggle" aria-pressed="false" aria-label="Show completed reminders" title="Show completed"></button>
@@ -185,6 +186,17 @@
                         </div>
                         <ul class="reminders-list" id="reminders-list"></ul>
                     </div>
+                    <div class="mosaic-card mosaic-map-card dashboard-admin-only hidden" id="admin-fine-map-card">
+                        <div class="mosaic-calendar-head mosaic-map-head">
+                            <span class="mosaic-calendar-title">City fine &amp; traffic hotspots</span>
+                            <div class="map-head-meta">
+                                <span class="map-live-badge"><span class="pulse-indicator pulse-indicator--sm"></span> Live</span>
+                                <span class="map-updated" id="admin-map-updated"></span>
+                            </div>
+                        </div>
+                        <p class="mosaic-map-lead">OpenStreetMap base with heat by violation volume. Larger rings mark cameras where more fines are raised.</p>
+                        <div id="leaflet-fine-map" class="leaflet-fine-map" role="region" aria-label="City map"></div>
+                    </div>
                 </div>
                 <div class="dashboard-mosaic-right">
                     <div class="mosaic-welcome">
@@ -195,7 +207,7 @@
                         </div>
                         <span class="mosaic-welcome-chevron" aria-hidden="true">⌄</span>
                     </div>
-                    <div class="mosaic-card mosaic-balance">
+                    <div class="mosaic-card mosaic-balance dashboard-user-only">
                         <div class="mosaic-balance-top">
                             <div>
                                 <p class="mosaic-balance-hi">Hi <span id="balance-greeting-name">there</span></p>
@@ -212,7 +224,7 @@
                         </div>
                         <div class="mosaic-balance-bottom">
                             <span class="mosaic-card-mask">•••• 5021</span>
-                            <a href="#fines" class="mosaic-send-btn">Open fines</a>
+                            <a href="#fines" class="mosaic-send-btn">Pay fines</a>
                         </div>
                     </div>
                     <div class="mosaic-pair mosaic-pair--bottom">
@@ -567,6 +579,8 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="app.js"></script>
     </div> <!-- End App Container -->
 </body>
