@@ -48,6 +48,182 @@ function formatDate(d) {
     return d.toISOString().split('T')[0];
 }
 
+function toYMDLocal(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+const REMINDERS_STORAGE_KEY = 'trafficai-daily-reminders';
+const REMINDERS_OPTS_KEY = 'trafficai-reminders-opts';
+
+const DailyReminders = {
+    selectedDate: null,
+    showDone: false,
+
+    init() {
+        this.weekEl = document.getElementById('reminders-week');
+        this.listEl = document.getElementById('reminders-list');
+        this.inputEl = document.getElementById('reminder-text-input');
+        this.toggleEl = document.getElementById('reminders-show-done-toggle');
+        if (!this.weekEl || !this.listEl) return;
+
+        const opts = JSON.parse(localStorage.getItem(REMINDERS_OPTS_KEY) || '{}');
+        this.showDone = !!opts.showDone;
+        if (this.toggleEl) {
+            this.toggleEl.setAttribute('aria-pressed', this.showDone ? 'true' : 'false');
+            this.toggleEl.addEventListener('click', () => {
+                this.showDone = !this.showDone;
+                this.toggleEl.setAttribute('aria-pressed', this.showDone ? 'true' : 'false');
+                localStorage.setItem(REMINDERS_OPTS_KEY, JSON.stringify({ showDone: this.showDone }));
+                this.renderList();
+            });
+        }
+
+        this.selectedDate = toYMDLocal(new Date());
+
+        document.getElementById('reminder-add-btn')?.addEventListener('click', () => this.add());
+
+        this.inputEl?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.add();
+            }
+        });
+
+        this.weekEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('.reminders-day-btn');
+            if (!btn?.dataset.date) return;
+            this.selectedDate = btn.dataset.date;
+            this.renderWeek();
+            this.renderList();
+        });
+
+        this.listEl.addEventListener('change', (e) => {
+            const t = e.target;
+            if (t.classList.contains('reminder-check')) {
+                this.toggleDone(t.dataset.id, t.checked);
+            }
+        });
+
+        this.listEl.addEventListener('click', (e) => {
+            const del = e.target.closest('.reminder-delete');
+            if (del?.dataset.id) this.remove(del.dataset.id);
+        });
+
+        this.renderWeek();
+        this.renderList();
+    },
+
+    load() {
+        try {
+            const raw = localStorage.getItem(REMINDERS_STORAGE_KEY);
+            if (!raw) return [];
+            const arr = JSON.parse(raw);
+            return Array.isArray(arr) ? arr : [];
+        } catch {
+            return [];
+        }
+    },
+
+    save(list) {
+        localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(list));
+    },
+
+    newId() {
+        return typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `r-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    },
+
+    add() {
+        const text = (this.inputEl?.value || '').trim();
+        if (!text) {
+            showToast('Enter reminder text', 'info');
+            return;
+        }
+        const list = this.load();
+        list.push({
+            id: this.newId(),
+            date: this.selectedDate || toYMDLocal(new Date()),
+            text,
+            done: false,
+        });
+        this.save(list);
+        this.inputEl.value = '';
+        this.renderList();
+        showToast('Reminder added', 'success');
+    },
+
+    toggleDone(id, done) {
+        const list = this.load().map((r) => (r.id === id ? { ...r, done } : r));
+        this.save(list);
+        this.renderList();
+    },
+
+    remove(id) {
+        const list = this.load().filter((r) => r.id !== id);
+        this.save(list);
+        this.renderList();
+    },
+
+    renderWeek() {
+        const today = toYMDLocal(new Date());
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setHours(12, 0, 0, 0);
+            d.setDate(d.getDate() + i);
+            const ymd = toYMDLocal(d);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'reminders-day-btn';
+            btn.dataset.date = ymd;
+            const dow = d.toLocaleDateString(undefined, { weekday: 'short' });
+            const dom = d.getDate();
+            if (ymd === today) btn.classList.add('reminders-day--today');
+            if (ymd === this.selectedDate) btn.classList.add('reminders-day--selected');
+            btn.innerHTML = `<span class="reminders-day-dow">${dow}</span><span>${dom}</span>`;
+            frag.appendChild(btn);
+        }
+        this.weekEl.innerHTML = '';
+        this.weekEl.appendChild(frag);
+    },
+
+    renderList() {
+        const day = this.selectedDate;
+        let list = this.load().filter((r) => r.date === day);
+        if (!this.showDone) list = list.filter((r) => !r.done);
+        list.sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+
+        if (list.length === 0) {
+            this.listEl.innerHTML =
+                '<li class="reminders-empty">No reminders for this day' +
+                (this.showDone ? '' : ' (completed hidden)') +
+                '.</li>';
+            return;
+        }
+
+        this.listEl.innerHTML = list
+            .map(
+                (r) => `
+            <li class="reminder-item${r.done ? ' reminder-item--done' : ''}">
+                <input type="checkbox" class="reminder-check" data-id="${r.id}" ${r.done ? 'checked' : ''} aria-label="Mark done">
+                <span class="reminder-text">${escapeHtml(r.text)}</span>
+                <button type="button" class="reminder-delete" data-id="${r.id}" aria-label="Remove">×</button>
+            </li>`
+            )
+            .join('');
+    },
+};
+
 // ============================================
 // Toast Notifications
 // ============================================
@@ -296,6 +472,38 @@ async function renderDashboard() {
         document.getElementById('stat-fines-collected').textContent = formatCurrency(stats.finesCollected);
         document.getElementById('stat-pending').textContent = formatCurrency(stats.pendingFines);
         document.getElementById('stat-cameras').textContent = stats.totalCameras;
+
+        const sbV = document.getElementById('sidebar-stat-violations');
+        const sbC = document.getElementById('sidebar-stat-collected');
+        if (sbV) sbV.textContent = stats.totalViolations;
+        if (sbC) sbC.textContent = formatCurrency(stats.finesCollected);
+
+        const totalMoney = Number(stats.finesCollected) + Number(stats.pendingFines);
+        const collectionPct = totalMoney > 0
+            ? Math.min(100, Math.round((Number(stats.finesCollected) / totalMoney) * 100))
+            : 0;
+        const bar = document.getElementById('dashboard-collection-bar');
+        const clearBar = document.getElementById('dashboard-clearance-bar');
+        const clearPct = document.getElementById('dashboard-clearance-pct');
+        const donut = document.getElementById('dashboard-donut');
+        const donutLbl = document.getElementById('dashboard-donut-label');
+        if (bar) bar.style.width = `${collectionPct}%`;
+        if (clearBar) clearBar.style.width = `${collectionPct}%`;
+        if (clearPct) clearPct.textContent = `${collectionPct}%`;
+        if (donut) donut.style.setProperty('--donut-end', `${(collectionPct / 100) * 360}deg`);
+        if (donutLbl) donutLbl.textContent = `${collectionPct}%`;
+        const donutCap = document.getElementById('dashboard-donut-caption');
+        if (donutCap) {
+            donutCap.textContent = totalMoney <= 0
+                ? 'No fine volume yet'
+                : `${collectionPct}% of collected + pending total`;
+        }
+
+        const user = Auth.getUser();
+        const greet = document.getElementById('balance-greeting-name');
+        if (user && greet) greet.textContent = user.username;
+        const roleLbl = document.getElementById('dashboard-user-role-label');
+        if (user && roleLbl) roleLbl.textContent = user.role === 'Admin' ? 'Administrator' : 'Vehicle owner';
 
         // Recent violations
         const tbody = document.getElementById('dashboard-violations-body');
@@ -894,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Modal.init();
     Theme.init();
     Auth.init();
+    DailyReminders.init();
 
     function onHashChange() {
         const hash = location.hash.replace('#', '') || 'dashboard';
