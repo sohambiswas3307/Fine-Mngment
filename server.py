@@ -3,7 +3,8 @@ E Parivahan — Flask Backend with SQLite Database
 AI-Based Smart Traffic Violation Detection & Fine Management System
 """
 
-import sqlite3
+import mysql.connector
+from mysql.connector import pooling
 import os
 import uuid
 import threading
@@ -13,7 +14,6 @@ from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import cv2
-from ultralytics import YOLO
 
 # Fix for Windows Unicode printing issues
 if sys.platform == 'win32':
@@ -40,55 +40,64 @@ PROCESSED_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pro
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
-# Initialize YOLO model
-print("Loading YOLOv8 model...")
-try:
-    import torch
-    import ultralytics.nn.tasks
-    torch.serialization.add_safe_globals([ultralytics.nn.tasks.DetectionModel])
-except Exception as e:
-    pass
-model = YOLO('yolov8n.pt') # Lightweight model for quick processing
-print("Model loaded.")
+# YOLO model removed as per user request (Switching to Classic CV)
+model = None
+print("Using Classic CV (Background Subtraction) for detection.")
 
 # ============================================
 # Database Helpers
 # ============================================
 
+# MySQL Configuration
+MYSQL_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'root',
+    'database': 'trafficai',
+    'charset': 'utf8mb4',
+    'collation': 'utf8mb4_unicode_ci'
+}
+
+# Create a connection pool
+db_pool = mysql.connector.pooling.MySQLConnectionPool(
+    pool_name="traffic_pool",
+    pool_size=10,
+    **MYSQL_CONFIG
+)
+
 def get_db():
-    """Get a database connection with row factory."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    """Get a database connection from the pool."""
+    conn = db_pool.get_connection()
     return conn
 
+def dict_row(row, columns):
+    """Convert a row tuple to dict using provided column names."""
+    return dict(zip(columns, row)) if row else None
 
-def dict_row(row):
-    """Convert sqlite3.Row to dict."""
-    return dict(row) if row else None
-
-
-def dict_rows(rows):
-    """Convert list of sqlite3.Row to list of dicts."""
-    return [dict(r) for r in rows]
+def dict_rows(rows, columns):
+    """Convert list of row tuples to list of dicts."""
+    return [dict(zip(columns, r)) for r in rows]
 
 
 def next_id(table, prefix):
     """Generate the next sequential ID for a table."""
     conn = get_db()
-    cursor = conn.execute(f"SELECT COUNT(*) as cnt FROM {table}")
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT COUNT(*) as cnt FROM {table}")
     row = cursor.fetchone()
-    count = row['cnt'] if row else 0
-    # Find the max numeric suffix
-    cursor2 = conn.execute(f"SELECT {table[:-1]}_id FROM {table}")
-    all_rows = cursor2.fetchall()
+    count = row[0] if row else 0
+    
+    id_col = f"{table[:-1]}_id"
+    cursor.execute(f"SELECT {id_col} FROM {table}")
+    all_rows = cursor.fetchall()
     nums = []
     for r in all_rows:
-        val = list(r)[0]
+        val = r[0]
         try:
             nums.append(int(val.replace(prefix + '-', '')))
         except:
             nums.append(0)
+    cursor.close()
     conn.close()
     next_num = max(nums, default=0) + 1
     return f"{prefix}-{str(next_num).zfill(3)}"
@@ -99,119 +108,127 @@ def next_id(table, prefix):
 # ============================================
 
 def init_db():
-    """Create tables if they don't exist."""
+    """Create tables if they don't exist in MySQL."""
     conn = get_db()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS cameras (
-            camera_id TEXT PRIMARY KEY,
-            location TEXT NOT NULL,
-            status TEXT DEFAULT 'Active',
-            latitude REAL,
-            longitude REAL
-        );
-
-        CREATE TABLE IF NOT EXISTS owners (
-            owner_id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            license_no TEXT NOT NULL,
-            phone TEXT,
-            email TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS vehicles (
-            vehicle_id TEXT PRIMARY KEY,
-            owner_id TEXT NOT NULL,
-            reg_no TEXT NOT NULL,
-            type TEXT NOT NULL,
-            color TEXT,
+    cursor = conn.cursor()
+    
+    tables = [
+        """CREATE TABLE IF NOT EXISTS cameras (
+            camera_id VARCHAR(50) PRIMARY KEY,
+            location VARCHAR(255) NOT NULL,
+            status VARCHAR(50) DEFAULT 'Active',
+            latitude DOUBLE,
+            longitude DOUBLE
+        )""",
+        """CREATE TABLE IF NOT EXISTS owners (
+            owner_id VARCHAR(50) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            license_no VARCHAR(255) NOT NULL,
+            phone VARCHAR(50),
+            email VARCHAR(255)
+        )""",
+        """CREATE TABLE IF NOT EXISTS vehicles (
+            vehicle_id VARCHAR(50) PRIMARY KEY,
+            owner_id VARCHAR(50) NOT NULL,
+            reg_no VARCHAR(50) NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            color VARCHAR(50),
             FOREIGN KEY (owner_id) REFERENCES owners(owner_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS violations (
-            violation_id TEXT PRIMARY KEY,
-            vehicle_id TEXT NOT NULL,
-            camera_id TEXT NOT NULL,
-            type TEXT NOT NULL,
-            date TEXT NOT NULL,
-            confidence INTEGER DEFAULT 0,
+        )""",
+        """CREATE TABLE IF NOT EXISTS violations (
+            violation_id VARCHAR(50) PRIMARY KEY,
+            vehicle_id VARCHAR(50) NOT NULL,
+            camera_id VARCHAR(50) NOT NULL,
+            type VARCHAR(100) NOT NULL,
+            date VARCHAR(50) NOT NULL,
+            confidence INT DEFAULT 0,
             FOREIGN KEY (vehicle_id) REFERENCES vehicles(vehicle_id),
             FOREIGN KEY (camera_id) REFERENCES cameras(camera_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS fines (
-            fine_id TEXT PRIMARY KEY,
-            violation_id TEXT NOT NULL,
-            amount REAL NOT NULL,
-            status TEXT DEFAULT 'Unpaid',
+        )""",
+        """CREATE TABLE IF NOT EXISTS fines (
+            fine_id VARCHAR(50) PRIMARY KEY,
+            violation_id VARCHAR(50) NOT NULL,
+            amount DOUBLE NOT NULL,
+            status VARCHAR(50) DEFAULT 'Unpaid',
             FOREIGN KEY (violation_id) REFERENCES violations(violation_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS payments (
-            payment_id TEXT PRIMARY KEY,
-            fine_id TEXT NOT NULL,
-            amount REAL NOT NULL,
-            date TEXT NOT NULL,
-            mode TEXT NOT NULL,
+        )""",
+        """CREATE TABLE IF NOT EXISTS payments (
+            payment_id VARCHAR(50) PRIMARY KEY,
+            fine_id VARCHAR(50) NOT NULL,
+            amount DOUBLE NOT NULL,
+            date VARCHAR(50) NOT NULL,
+            mode VARCHAR(50) NOT NULL,
             FOREIGN KEY (fine_id) REFERENCES fines(fine_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS users (
-            user_id TEXT PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL, -- 'Admin' or 'User'
-            owner_id TEXT, -- Linked to owners table for 'User' role
+        )""",
+        """CREATE TABLE IF NOT EXISTS users (
+            user_id VARCHAR(50) PRIMARY KEY,
+            username VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            owner_id VARCHAR(50),
             FOREIGN KEY (owner_id) REFERENCES owners(owner_id)
-        );
-    """)
+        )"""
+    ]
+    
+    for table_sql in tables:
+        cursor.execute(table_sql)
+        
     conn.commit()
+    cursor.close()
     conn.close()
 
 
 def migrate_schema():
-    """Add camera coordinates for map features; backfill demo pins."""
+    """Add camera coordinates for map features; backfill demo pins in MySQL."""
     conn = get_db()
+    cursor = conn.cursor()
     try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(cameras)").fetchall()]
-        if 'latitude' not in cols:
-            conn.execute("ALTER TABLE cameras ADD COLUMN latitude REAL")
-        if 'longitude' not in cols:
-            conn.execute("ALTER TABLE cameras ADD COLUMN longitude REAL")
-        conn.commit()
+        # Check if columns exist (MySQL specific)
+        cursor.execute("SHOW COLUMNS FROM cameras LIKE 'latitude'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE cameras ADD COLUMN latitude DOUBLE")
+        cursor.execute("SHOW COLUMNS FROM cameras LIKE 'longitude'")
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE cameras ADD COLUMN longitude DOUBLE")
+        
         for cam_id, (lat, lng) in CAMERA_COORDS.items():
-            conn.execute(
-                """UPDATE cameras SET latitude = COALESCE(latitude, ?), longitude = COALESCE(longitude, ?)
-                   WHERE camera_id = ?""",
+            cursor.execute(
+                """UPDATE cameras SET latitude = COALESCE(latitude, %s), longitude = COALESCE(longitude, %s)
+                   WHERE camera_id = %s""",
                 (lat, lng, cam_id),
             )
         conn.commit()
     finally:
+        cursor.close()
         conn.close()
 
 
 def seed_data():
-    """Insert demo data if tables are empty."""
+    """Insert demo data if tables are empty in MySQL."""
     conn = get_db()
-    count = conn.execute("SELECT COUNT(*) FROM cameras").fetchone()[0]
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM cameras")
+    count = cursor.fetchone()[0]
     if count > 0:
+        cursor.close()
         conn.close()
         return
 
     # Cameras
     cam_rows = [
-        ('CAM-001', 'MG Road Junction', 'Active', *CAMERA_COORDS['CAM-001']),
-        ('CAM-002', 'Highway Toll Plaza', 'Active', *CAMERA_COORDS['CAM-002']),
-        ('CAM-003', 'City Center Signal', 'Active', *CAMERA_COORDS['CAM-003']),
-        ('CAM-004', 'Ring Road Flyover', 'Active', *CAMERA_COORDS['CAM-004']),
-        ('CAM-005', 'School Zone - Park Street', 'Active', *CAMERA_COORDS['CAM-005']),
+        ('CAM-001', 'MG Road Junction', 'Active', CAMERA_COORDS['CAM-001'][0], CAMERA_COORDS['CAM-001'][1]),
+        ('CAM-002', 'Highway Toll Plaza', 'Active', CAMERA_COORDS['CAM-002'][0], CAMERA_COORDS['CAM-002'][1]),
+        ('CAM-003', 'City Center Signal', 'Active', CAMERA_COORDS['CAM-003'][0], CAMERA_COORDS['CAM-003'][1]),
+        ('CAM-004', 'Ring Road Flyover', 'Active', CAMERA_COORDS['CAM-004'][0], CAMERA_COORDS['CAM-004'][1]),
+        ('CAM-005', 'School Zone - Park Street', 'Active', CAMERA_COORDS['CAM-005'][0], CAMERA_COORDS['CAM-005'][1]),
     ]
-    conn.executemany(
-        "INSERT INTO cameras (camera_id, location, status, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
+    cursor.executemany(
+        "INSERT INTO cameras (camera_id, location, status, latitude, longitude) VALUES (%s, %s, %s, %s, %s)",
         cam_rows,
     )
 
     # Owners
-    conn.executemany("INSERT INTO owners VALUES (?, ?, ?, ?, ?)", [
+    cursor.executemany("INSERT INTO owners VALUES (%s, %s, %s, %s, %s)", [
         ('OWN-001', 'Rahul Sharma', 'DL-1420110012345', '9876543210', 'rahul.sharma@email.com'),
         ('OWN-002', 'Priya Patel', 'MH-0220090054321', '9876543211', 'priya.patel@email.com'),
         ('OWN-003', 'Amit Kumar', 'KA-0520150098765', '9876543212', 'amit.kumar@email.com'),
@@ -220,7 +237,7 @@ def seed_data():
     ])
 
     # Vehicles
-    conn.executemany("INSERT INTO vehicles VALUES (?, ?, ?, ?, ?)", [
+    cursor.executemany("INSERT INTO vehicles VALUES (%s, %s, %s, %s, %s)", [
         ('VEH-001', 'OWN-001', 'DL-14-AB-1234', 'Car', 'White'),
         ('VEH-002', 'OWN-002', 'MH-02-CD-5678', 'Motorcycle', 'Black'),
         ('VEH-003', 'OWN-003', 'KA-05-EF-9012', 'Car', 'Silver'),
@@ -230,7 +247,7 @@ def seed_data():
     ])
 
     # Violations
-    conn.executemany("INSERT INTO violations VALUES (?, ?, ?, ?, ?, ?)", [
+    cursor.executemany("INSERT INTO violations VALUES (%s, %s, %s, %s, %s, %s)", [
         ('VIO-001', 'VEH-002', 'CAM-001', 'Helmetless Riding', '2026-04-26', 94),
         ('VIO-002', 'VEH-003', 'CAM-002', 'Overspeeding', '2026-04-27', 97),
         ('VIO-003', 'VEH-001', 'CAM-003', 'Signal Jumping', '2026-04-28', 92),
@@ -241,7 +258,7 @@ def seed_data():
     ])
 
     # Fines
-    conn.executemany("INSERT INTO fines VALUES (?, ?, ?, ?)", [
+    cursor.executemany("INSERT INTO fines VALUES (%s, %s, %s, %s)", [
         ('FIN-001', 'VIO-001', 500, 'Paid'),
         ('FIN-002', 'VIO-002', 2000, 'Paid'),
         ('FIN-003', 'VIO-003', 1000, 'Unpaid'),
@@ -252,13 +269,13 @@ def seed_data():
     ])
 
     # Payments
-    conn.executemany("INSERT INTO payments VALUES (?, ?, ?, ?, ?)", [
+    cursor.executemany("INSERT INTO payments VALUES (%s, %s, %s, %s, %s)", [
         ('PAY-001', 'FIN-001', 500, '2026-04-28', 'UPI'),
         ('PAY-002', 'FIN-002', 2000, '2026-04-29', 'Credit Card'),
     ])
 
     # Users
-    conn.executemany("INSERT INTO users VALUES (?, ?, ?, ?, ?)", [
+    cursor.executemany("INSERT INTO users VALUES (%s, %s, %s, %s, %s)", [
         ('USR-001', 'admin', 'admin123', 'Admin', None),
         ('USR-002', 'rahul', 'rahul123', 'User', 'OWN-001'),
         ('USR-003', 'priya', 'priya123', 'User', 'OWN-002'),
@@ -266,6 +283,7 @@ def seed_data():
     ])
 
     conn.commit()
+    cursor.close()
     conn.close()
     print("✓ Database seeded with demo data (including RBAC users)")
 
@@ -290,12 +308,14 @@ def login():
     password = data.get('password')
 
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password)).fetchone()
-    conn.close()
-
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+    user = cursor.fetchone()
+    
     if user:
-        u = dict_row(user)
-        # In a real app, we'd return a JWT. Here we return user info for simplicity.
+        u = dict_row(user, cursor.column_names)
+        cursor.close()
+        conn.close()
         return jsonify({
             'success': True,
             'user': {
@@ -304,7 +324,57 @@ def login():
                 'owner_id': u['owner_id']
             }
         })
+    cursor.close()
+    conn.close()
     return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
+
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 1. Check if user already exists
+        cursor.execute("SELECT * FROM users WHERE username = %s", (data['username'],))
+        if cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({'success': False, 'message': 'Username already exists'}), 400
+
+        # 2. Generate IDs
+        own_id = next_id('owners', 'OWN')
+        veh_id = next_id('vehicles', 'VEH')
+        usr_id = next_id('users', 'USR')
+
+        # 3. Insert Owner
+        cursor.execute(
+            "INSERT INTO owners VALUES (%s, %s, %s, %s, %s)",
+            (own_id, data['name'], data['license_no'], data.get('phone', ''), data.get('email', ''))
+        )
+
+        # 4. Insert Vehicle
+        cursor.execute(
+            "INSERT INTO vehicles VALUES (%s, %s, %s, %s, %s)",
+            (veh_id, own_id, data['vehicle_reg'], data['vehicle_type'], data.get('vehicle_color', ''))
+        )
+
+        # 5. Insert User
+        cursor.execute(
+            "INSERT INTO users VALUES (%s, %s, %s, %s, %s)",
+            (usr_id, data['username'], data['password'], 'User', own_id)
+        )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Registration successful!'})
+        
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 # ============================================
@@ -315,25 +385,29 @@ def login():
 def get_stats():
     owner_id = request.args.get('owner_id')
     conn = get_db()
+    cursor = conn.cursor()
     
     if owner_id:
         # User-specific stats
-        total_violations = conn.execute("""
+        cursor.execute("""
             SELECT COUNT(*) FROM violations v
             JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
-            WHERE veh.owner_id = ?
-        """, (owner_id,)).fetchone()[0]
+            WHERE veh.owner_id = %s
+        """, (owner_id,))
+        total_violations = cursor.fetchone()[0]
         
-        total_cameras = conn.execute("SELECT COUNT(*) FROM cameras WHERE status = 'Active'").fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM cameras WHERE status = 'Active'")
+        total_cameras = cursor.fetchone()[0]
         
         collected = 0
         
-        pending = conn.execute("""
+        cursor.execute("""
             SELECT COALESCE(SUM(f.amount), 0) FROM fines f
             JOIN violations v ON f.violation_id = v.violation_id
             JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
-            WHERE f.status = 'Unpaid' AND veh.owner_id = ?
-        """, (owner_id,)).fetchone()[0]
+            WHERE f.status = 'Unpaid' AND veh.owner_id = %s
+        """, (owner_id,))
+        pending = cursor.fetchone()[0]
 
         recent_query = """
             SELECT v.violation_id, v.type, v.date, v.confidence,
@@ -344,34 +418,46 @@ def get_stats():
             JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
             LEFT JOIN cameras c ON v.camera_id = c.camera_id
             LEFT JOIN fines f ON f.violation_id = v.violation_id
-            WHERE veh.owner_id = ?
+            WHERE veh.owner_id = %s
             ORDER BY v.date DESC, v.violation_id DESC
             LIMIT 10
         """
-        recent = conn.execute(recent_query, (owner_id,)).fetchall()
+        cursor.execute(recent_query, (owner_id,))
+        recent_rows = cursor.fetchall()
+        recent = dict_rows(recent_rows, cursor.column_names)
         
-        type_counts = dict_rows(conn.execute("""
+        cursor.execute("""
             SELECT v.type, COUNT(*) as count FROM violations v
             JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
-            WHERE veh.owner_id = ?
+            WHERE veh.owner_id = %s
             GROUP BY v.type ORDER BY count DESC
-        """, (owner_id,)).fetchall())
+        """, (owner_id,))
+        type_counts = dict_rows(cursor.fetchall(), cursor.column_names)
 
-        registered_owners = None
-        registered_vehicles = conn.execute(
-            "SELECT COUNT(*) FROM vehicles WHERE owner_id = ?", (owner_id,)
-        ).fetchone()[0]
+        cursor.execute("SELECT name, license_no FROM owners WHERE owner_id = %s", (owner_id,))
+        owner_info = cursor.fetchone()
+        owner_name = owner_info[0] if owner_info else 'Unknown'
+        license_no = owner_info[1] if owner_info else 'N/A'
+
+        cursor.execute("SELECT COUNT(*) FROM vehicles WHERE owner_id = %s", (owner_id,))
+        registered_vehicles = cursor.fetchone()[0]
         
     else:
         # Admin global stats
-        total_violations = conn.execute("SELECT COUNT(*) FROM violations").fetchone()[0]
-        total_cameras = conn.execute("SELECT COUNT(*) FROM cameras").fetchone()[0]
-        collected = conn.execute("SELECT COALESCE(SUM(amount), 0) FROM payments").fetchone()[0]
-        pending = conn.execute("SELECT COALESCE(SUM(amount), 0) FROM fines WHERE status = 'Unpaid'").fetchone()[0]
-        registered_owners = conn.execute("SELECT COUNT(*) FROM owners").fetchone()[0]
-        registered_vehicles = conn.execute("SELECT COUNT(*) FROM vehicles").fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM violations")
+        total_violations = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM cameras")
+        total_cameras = cursor.fetchone()[0]
+        cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments")
+        collected = cursor.fetchone()[0]
+        cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM fines WHERE status = 'Unpaid'")
+        pending = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM owners")
+        registered_owners = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM vehicles")
+        registered_vehicles = cursor.fetchone()[0]
 
-        recent = conn.execute("""
+        cursor.execute("""
             SELECT v.violation_id, v.type, v.date, v.confidence,
                    veh.reg_no as vehicle_reg,
                    c.location as camera_location,
@@ -382,23 +468,27 @@ def get_stats():
             LEFT JOIN fines f ON f.violation_id = v.violation_id
             ORDER BY v.date DESC, v.violation_id DESC
             LIMIT 10
-        """).fetchall()
+        """)
+        recent = dict_rows(cursor.fetchall(), cursor.column_names)
 
-        type_counts = dict_rows(conn.execute(
-            "SELECT type, COUNT(*) as count FROM violations GROUP BY type ORDER BY count DESC"
-        ).fetchall())
+        cursor.execute("SELECT type, COUNT(*) as count FROM violations GROUP BY type ORDER BY count DESC")
+        type_counts = dict_rows(cursor.fetchall(), cursor.column_names)
 
+    cursor.close()
     conn.close()
     payload = {
         'totalViolations': total_violations,
         'totalCameras': total_cameras,
         'finesCollected': collected,
         'pendingFines': pending,
-        'recentViolations': dict_rows(recent),
+        'recentViolations': recent,
         'violationTypes': type_counts,
         'registeredVehicles': registered_vehicles,
     }
-    if registered_owners is not None:
+    if owner_id:
+        payload['licenseNo'] = license_no
+        payload['ownerName'] = owner_name
+    else:
         payload['registeredOwners'] = registered_owners
     return jsonify(payload)
 
@@ -409,7 +499,8 @@ def map_hotspots():
     if request.args.get('owner_id'):
         return jsonify({'ok': False, 'message': 'Admin only'}), 403
     conn = get_db()
-    rows = conn.execute("""
+    cursor = conn.cursor()
+    cursor.execute("""
         SELECT c.camera_id, c.location, c.latitude, c.longitude, c.status,
             (SELECT COUNT(*) FROM violations v WHERE v.camera_id = c.camera_id) AS violations,
             (SELECT COUNT(*) FROM violations v
@@ -422,11 +513,14 @@ def map_hotspots():
              WHERE v.camera_id = c.camera_id AND f.status = 'Unpaid') AS pending_amount
         FROM cameras c
         ORDER BY violations DESC, c.camera_id
-    """).fetchall()
+    """)
+    rows = cursor.fetchall()
+    columns = cursor.column_names
+    cursor.close()
     conn.close()
 
     center_lat, center_lng = CITY_MAP_DEFAULT['center']
-    rows_list = [dict(r) for r in rows]
+    rows_list = dict_rows(rows, columns)
     max_v = max((int(d['violations'] or 0) for d in rows_list), default=1)
     points = []
     for d in rows_list:
@@ -459,9 +553,13 @@ def map_hotspots():
 @app.route('/api/cameras', methods=['GET'])
 def list_cameras():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM cameras ORDER BY camera_id").fetchall()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM cameras ORDER BY camera_id")
+    rows = cursor.fetchall()
+    res = dict_rows(rows, cursor.column_names)
+    cursor.close()
     conn.close()
-    return jsonify(dict_rows(rows))
+    return jsonify(res)
 
 
 @app.route('/api/cameras', methods=['POST'])
@@ -469,12 +567,14 @@ def create_camera():
     data = request.json
     cam_id = next_id('cameras', 'CAM')
     conn = get_db()
-    conn.execute(
-        "INSERT INTO cameras (camera_id, location, status, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO cameras (camera_id, location, status, latitude, longitude) VALUES (%s, %s, %s, %s, %s)",
         (cam_id, data['location'], data.get('status', 'Active'),
          data.get('latitude'), data.get('longitude')),
     )
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'id': cam_id, 'message': 'Camera added'}), 201
 
@@ -483,12 +583,14 @@ def create_camera():
 def update_camera(cam_id):
     data = request.json
     conn = get_db()
-    conn.execute(
-        "UPDATE cameras SET location=?, status=?, latitude=?, longitude=? WHERE camera_id=?",
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE cameras SET location=%s, status=%s, latitude=%s, longitude=%s WHERE camera_id=%s",
         (data['location'], data.get('status', 'Active'),
          data.get('latitude'), data.get('longitude'), cam_id),
     )
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'message': 'Camera updated'})
 
@@ -496,8 +598,10 @@ def update_camera(cam_id):
 @app.route('/api/cameras/<cam_id>', methods=['DELETE'])
 def delete_camera(cam_id):
     conn = get_db()
-    conn.execute("DELETE FROM cameras WHERE camera_id=?", (cam_id,))
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM cameras WHERE camera_id=%s", (cam_id,))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'message': 'Camera deleted'})
 
@@ -510,12 +614,16 @@ def delete_camera(cam_id):
 def list_owners():
     owner_id = request.args.get('owner_id')
     conn = get_db()
+    cursor = conn.cursor()
     if owner_id:
-        rows = conn.execute("SELECT * FROM owners WHERE owner_id = ?", (owner_id,)).fetchall()
+        cursor.execute("SELECT * FROM owners WHERE owner_id = %s", (owner_id,))
     else:
-        rows = conn.execute("SELECT * FROM owners ORDER BY owner_id").fetchall()
+        cursor.execute("SELECT * FROM owners ORDER BY owner_id")
+    rows = cursor.fetchall()
+    res = dict_rows(rows, cursor.column_names)
+    cursor.close()
     conn.close()
-    return jsonify(dict_rows(rows))
+    return jsonify(res)
 
 
 @app.route('/api/owners', methods=['POST'])
@@ -523,9 +631,11 @@ def create_owner():
     data = request.json
     own_id = next_id('owners', 'OWN')
     conn = get_db()
-    conn.execute("INSERT INTO owners VALUES (?, ?, ?, ?, ?)",
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO owners VALUES (%s, %s, %s, %s, %s)",
                  (own_id, data['name'], data['license_no'], data.get('phone', ''), data.get('email', '')))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'id': own_id, 'message': 'Owner added'}), 201
 
@@ -534,9 +644,11 @@ def create_owner():
 def update_owner(own_id):
     data = request.json
     conn = get_db()
-    conn.execute("UPDATE owners SET name=?, license_no=?, phone=?, email=? WHERE owner_id=?",
+    cursor = conn.cursor()
+    cursor.execute("UPDATE owners SET name=%s, license_no=%s, phone=%s, email=%s WHERE owner_id=%s",
                  (data['name'], data['license_no'], data.get('phone', ''), data.get('email', ''), own_id))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'message': 'Owner updated'})
 
@@ -544,8 +656,10 @@ def update_owner(own_id):
 @app.route('/api/owners/<own_id>', methods=['DELETE'])
 def delete_owner(own_id):
     conn = get_db()
-    conn.execute("DELETE FROM owners WHERE owner_id=?", (own_id,))
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM owners WHERE owner_id=%s", (own_id,))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'message': 'Owner deleted'})
 
@@ -558,19 +672,24 @@ def delete_owner(own_id):
 def list_vehicles():
     owner_id = request.args.get('owner_id')
     conn = get_db()
+    cursor = conn.cursor()
     query = """
         SELECT v.*, o.name as owner_name
         FROM vehicles v
         LEFT JOIN owners o ON v.owner_id = o.owner_id
     """
     if owner_id:
-        query += " WHERE v.owner_id = ?"
-        rows = conn.execute(query, (owner_id,)).fetchall()
+        query += " WHERE v.owner_id = %s"
+        cursor.execute(query, (owner_id,))
     else:
         query += " ORDER BY v.vehicle_id"
-        rows = conn.execute(query).fetchall()
+        cursor.execute(query)
+    
+    rows = cursor.fetchall()
+    res = dict_rows(rows, cursor.column_names)
+    cursor.close()
     conn.close()
-    return jsonify(dict_rows(rows))
+    return jsonify(res)
 
 
 @app.route('/api/vehicles', methods=['POST'])
@@ -578,9 +697,11 @@ def create_vehicle():
     data = request.json
     veh_id = next_id('vehicles', 'VEH')
     conn = get_db()
-    conn.execute("INSERT INTO vehicles VALUES (?, ?, ?, ?, ?)",
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO vehicles VALUES (%s, %s, %s, %s, %s)",
                  (veh_id, data['owner_id'], data['reg_no'], data['type'], data.get('color', '')))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'id': veh_id, 'message': 'Vehicle added'}), 201
 
@@ -589,9 +710,11 @@ def create_vehicle():
 def update_vehicle(veh_id):
     data = request.json
     conn = get_db()
-    conn.execute("UPDATE vehicles SET owner_id=?, reg_no=?, type=?, color=? WHERE vehicle_id=?",
+    cursor = conn.cursor()
+    cursor.execute("UPDATE vehicles SET owner_id=%s, reg_no=%s, type=%s, color=%s WHERE vehicle_id=%s",
                  (data['owner_id'], data['reg_no'], data['type'], data.get('color', ''), veh_id))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'message': 'Vehicle updated'})
 
@@ -599,8 +722,10 @@ def update_vehicle(veh_id):
 @app.route('/api/vehicles/<veh_id>', methods=['DELETE'])
 def delete_vehicle(veh_id):
     conn = get_db()
-    conn.execute("DELETE FROM vehicles WHERE vehicle_id=?", (veh_id,))
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM vehicles WHERE vehicle_id=%s", (veh_id,))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'message': 'Vehicle deleted'})
 
@@ -613,6 +738,7 @@ def delete_vehicle(veh_id):
 def list_violations():
     owner_id = request.args.get('owner_id')
     conn = get_db()
+    cursor = conn.cursor()
     query = """
         SELECT v.*, veh.reg_no as vehicle_reg, c.location as camera_location,
                COALESCE(f.status, 'N/A') as fine_status, f.fine_id, f.amount as fine_amount
@@ -622,14 +748,18 @@ def list_violations():
         LEFT JOIN fines f ON f.violation_id = v.violation_id
     """
     if owner_id:
-        query += " WHERE veh.owner_id = ?"
+        query += " WHERE veh.owner_id = %s"
         query += " ORDER BY v.date DESC, v.violation_id DESC"
-        rows = conn.execute(query, (owner_id,)).fetchall()
+        cursor.execute(query, (owner_id,))
     else:
         query += " ORDER BY v.date DESC, v.violation_id DESC"
-        rows = conn.execute(query).fetchall()
+        cursor.execute(query)
+    
+    rows = cursor.fetchall()
+    res = dict_rows(rows, cursor.column_names)
+    cursor.close()
     conn.close()
-    return jsonify(dict_rows(rows))
+    return jsonify(res)
 
 
 @app.route('/api/violations', methods=['POST'])
@@ -638,7 +768,6 @@ def create_violation():
     vio_id = next_id('violations', 'VIO')
     confidence = data.get('confidence', 90)
 
-    # Fine amounts by violation type
     fine_amounts = {
         'Signal Jumping': 1000, 'Overspeeding': 2000, 'Helmetless Riding': 500,
         'Illegal Parking': 500, 'Lane Violation': 1000, 'Wrong Way Driving': 2000,
@@ -647,15 +776,16 @@ def create_violation():
     amount = fine_amounts.get(data['type'], 500)
 
     conn = get_db()
-    conn.execute("INSERT INTO violations VALUES (?, ?, ?, ?, ?, ?)",
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO violations VALUES (%s, %s, %s, %s, %s, %s)",
                  (vio_id, data['vehicle_id'], data['camera_id'], data['type'], data['date'], confidence))
 
-    # Auto-generate fine
     fin_id = next_id('fines', 'FIN')
-    conn.execute("INSERT INTO fines VALUES (?, ?, ?, ?)",
+    cursor.execute("INSERT INTO fines VALUES (%s, %s, %s, %s)",
                  (fin_id, vio_id, amount, 'Unpaid'))
 
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({
         'violation_id': vio_id,
@@ -668,9 +798,11 @@ def create_violation():
 @app.route('/api/violations/<vio_id>', methods=['DELETE'])
 def delete_violation(vio_id):
     conn = get_db()
-    conn.execute("DELETE FROM fines WHERE violation_id=?", (vio_id,))
-    conn.execute("DELETE FROM violations WHERE violation_id=?", (vio_id,))
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM fines WHERE violation_id=%s", (vio_id,))
+    cursor.execute("DELETE FROM violations WHERE violation_id=%s", (vio_id,))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({'message': 'Violation and linked fine deleted'})
 
@@ -684,6 +816,7 @@ def list_fines():
     status_filter = request.args.get('status', 'all')
     owner_id = request.args.get('owner_id')
     conn = get_db()
+    cursor = conn.cursor()
     query = """
         SELECT f.*, v.type as violation_type, v.vehicle_id,
                veh.reg_no as vehicle_reg
@@ -695,16 +828,19 @@ def list_fines():
     params = []
     if owner_id:
         query += " AND f.status = 'Unpaid'"
-        query += " AND veh.owner_id = ?"
+        query += " AND veh.owner_id = %s"
         params.append(owner_id)
     elif status_filter != 'all':
-        query += " AND f.status = ?"
+        query += " AND f.status = %s"
         params.append(status_filter)
 
     query += " ORDER BY f.fine_id DESC"
-    rows = conn.execute(query, params).fetchall()
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    res = dict_rows(rows, cursor.column_names)
+    cursor.close()
     conn.close()
-    return jsonify(dict_rows(rows))
+    return jsonify(res)
 
 
 # ============================================
@@ -715,19 +851,23 @@ def list_fines():
 def list_payments():
     owner_id = request.args.get('owner_id')
     conn = get_db()
+    cursor = conn.cursor()
     if owner_id:
-        rows = conn.execute("""
+        cursor.execute("""
             SELECT p.* FROM payments p
             JOIN fines f ON p.fine_id = f.fine_id
             JOIN violations v ON f.violation_id = v.violation_id
             JOIN vehicles veh ON v.vehicle_id = veh.vehicle_id
-            WHERE veh.owner_id = ?
+            WHERE veh.owner_id = %s
             ORDER BY p.date DESC, p.payment_id DESC
-        """, (owner_id,)).fetchall()
+        """, (owner_id,))
     else:
-        rows = conn.execute("SELECT * FROM payments ORDER BY date DESC, payment_id DESC").fetchall()
+        cursor.execute("SELECT * FROM payments ORDER BY date DESC, payment_id DESC")
+    rows = cursor.fetchall()
+    res = dict_rows(rows, cursor.column_names)
+    cursor.close()
     conn.close()
-    return jsonify(dict_rows(rows))
+    return jsonify(res)
 
 
 @app.route('/api/payments', methods=['POST'])
@@ -737,19 +877,24 @@ def create_payment():
     fine_id = data['fine_id']
 
     conn = get_db()
+    cursor = conn.cursor()
     # Get fine amount
-    fine = conn.execute("SELECT * FROM fines WHERE fine_id=?", (fine_id,)).fetchone()
-    if not fine:
+    cursor.execute("SELECT * FROM fines WHERE fine_id=%s", (fine_id,))
+    fine_row = cursor.fetchone()
+    if not fine_row:
+        cursor.close()
         conn.close()
         return jsonify({'error': 'Fine not found'}), 404
 
+    fine = dict_row(fine_row, cursor.column_names)
     amount = fine['amount']
 
-    conn.execute("INSERT INTO payments VALUES (?, ?, ?, ?, ?)",
+    cursor.execute("INSERT INTO payments VALUES (%s, %s, %s, %s, %s)",
                  (pay_id, fine_id, amount, data['date'], data['mode']))
     # Update fine status to Paid
-    conn.execute("UPDATE fines SET status='Paid' WHERE fine_id=?", (fine_id,))
+    cursor.execute("UPDATE fines SET status='Paid' WHERE fine_id=%s", (fine_id,))
     conn.commit()
+    cursor.close()
     conn.close()
     return jsonify({
         'payment_id': pay_id,
@@ -779,14 +924,16 @@ def ai_detect():
     amount = fine_amounts.get(data['type'], 500)
 
     conn = get_db()
-    conn.execute("INSERT INTO violations VALUES (?, ?, ?, ?, ?, ?)",
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO violations VALUES (%s, %s, %s, %s, %s, %s)",
                  (vio_id, data['vehicle_id'], data['camera_id'], data['type'], data['date'], confidence))
 
     fin_id = next_id('fines', 'FIN')
-    conn.execute("INSERT INTO fines VALUES (?, ?, ?, ?)",
+    cursor.execute("INSERT INTO fines VALUES (%s, %s, %s, %s)",
                  (fin_id, vio_id, amount, 'Unpaid'))
 
     conn.commit()
+    cursor.close()
     conn.close()
 
     return jsonify({
@@ -826,171 +973,116 @@ def upload_video():
 
 
 def process_video_task(filename, camera_id):
-    """Background task to run YOLO on the video"""
-    job_id = filename
-    processing_jobs[job_id] = {'status': 'processing', 'progress': 0, 'detections': [], 'output_video': None}
-    
-    input_path = os.path.join(UPLOAD_FOLDER, filename)
-    output_filename = f"processed_{filename}"
-    output_path = os.path.join(PROCESSED_FOLDER, output_filename)
+    """
+    Background task: runs real CV-based violation detection on the uploaded video.
+    Uses ViolationDetector (violation_detector.py) which detects:
+      - Signal Jumping  (traffic light HSV state + stop-line tracking)
+      - Lane Violation  (Hough lane lines + ByteTrack centroid crossing)
+    """
+    import random
+    from violation_detector import ViolationDetector
 
-    cap = cv2.VideoCapture(input_path)
-    if not cap.isOpened():
+    job_id = filename
+    processing_jobs[job_id] = {
+        'status': 'processing', 'progress': 0,
+        'detections': [], 'output_video': None
+    }
+
+    input_path   = os.path.join(UPLOAD_FOLDER, filename)
+    out_filename = f"processed_{filename}"
+    output_path  = os.path.join(PROCESSED_FOLDER, out_filename)
+
+    # Pull vehicles from DB so we can link detections to real records
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM vehicles")
+    rows = cursor.fetchall()
+    vehicles = dict_rows(rows, cursor.column_names)
+    cursor.close()
+    conn.close()
+    if not vehicles:
         processing_jobs[job_id]['status'] = 'error'
-        processing_jobs[job_id]['message'] = 'Could not open video'
+        processing_jobs[job_id]['message'] = 'No vehicles in database to link violations to'
         return
 
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    # We output as mp4
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-    frame_count = 0
-    detections = []
-
-    # Get sample vehicles so we can tie detections to DB entries for full cycle
-    conn = get_db()
-    vehicles = dict_rows(conn.execute("SELECT * FROM vehicles LIMIT 5").fetchall())
-    conn.close()
-    
-    # YOLO COCO classes mapping relevant to us
-    # 0 = person, 1 = bicycle, 2 = car, 3 = motorcycle, 5 = bus, 7 = truck, 9 = traffic light
-    VIOLATION_HEURISTICS = [
-        {'type': 'Helmetless Riding', 'classes': [0, 3], 'desc': 'person + motorcycle'},
-        {'type': 'Illegal Parking', 'classes': [2, 5, 7], 'desc': 'car/truck'},
-        {'type': 'Signal Jumping', 'classes': [2, 3, 5, 7, 9], 'desc': 'vehicle + traffic light'}
-    ]
+    fine_amounts = {
+        'Signal Jumping': 1000, 'Lane Violation': 1000,
+        'Overspeeding': 2000,   'Wrong Way Driving': 2000,
+        'Helmetless Riding': 500, 'Illegal Parking': 500,
+        'Using Mobile Phone': 1500, 'Accident': 5000,
+    }
 
     try:
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
+        detector = ViolationDetector(camera_id=camera_id)
+        all_raw_violations = []
+
+        for progress, frame, frame_violations in detector.process(input_path, output_path):
+            processing_jobs[job_id]['progress'] = progress
+            all_raw_violations.extend(frame_violations)
+
+        # ── Deduplicate ──
+        deduped = []
+        seen_windows = {}
+        for v in all_raw_violations:
+            window_key = (v['type'], int(v['timestamp'] // 10))
+            if window_key not in seen_windows:
+                seen_windows[window_key] = True
+                deduped.append(v)
+
+        # ── Persist to database (Fixing ID collision) ──
+        saved = []
+        conn = get_db()
+        cursor = conn.cursor()
+        date_str = time.strftime('%Y-%m-%d')
+        
+        # Pre-fetch starting IDs to avoid collisions in loop
+        curr_vio_num = int(next_id('violations', 'VIO').split('-')[1])
+        curr_fin_num = int(next_id('fines', 'FIN').split('-')[1])
+
+        for v in deduped:
+            assigned_veh = random.choice(vehicles)
             
-            frame_count += 1
-            if frame_count % 30 == 0:  # update progress
-                processing_jobs[job_id]['progress'] = int((frame_count / total_frames) * 100)
-
-            # Process with YOLO
-            results = model(frame, verbose=False)
+            vio_id = f"VIO-{str(curr_vio_num).zfill(3)}"
+            curr_vio_num += 1
             
-            # Extract detections for heuristics
-            frame_detections = []
-            for r in results:
-                boxes = r.boxes
-                for box in boxes:
-                    cls_id = int(box.cls[0].item())
-                    conf = box.conf[0].item()
-                    
-                    if conf > 0.25:
-                        x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                        cls_name = model.names[cls_id]
-                        frame_detections.append({'cls_id': cls_id, 'name': cls_name, 'conf': conf, 'box': [x1, y1, x2, y2]})
-                        
-                        # Draw bounding box
-                        color = (0, 255, 0)
-                        if cls_id in [0, 2, 3, 5, 7]: # person, car, motorcycle, bus, truck - tracking
-                            color = (0, 0, 255) # Red for potential vehicles/people
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                        cv2.putText(frame, f"{cls_name} {conf:.2f}", (x1, max(10, y1-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-            # Apply heuristics arbitrarily to simulate AI violation classification based on YOLO objects
-            # For demonstration: If we see a person AND a motorcycle in the same frame, flag Helmetless
-            person_found = any(d['cls_id'] == 0 for d in frame_detections)
-            moto_found = any(d['cls_id'] == 3 for d in frame_detections)
-            car_found = any(d['cls_id'] == 2 for d in frame_detections)
-            light_found = any(d['cls_id'] == 9 for d in frame_detections)
-
-            violation_type = None
-            conf_score = 0
+            cursor.execute(
+                "INSERT INTO violations VALUES (%s, %s, %s, %s, %s, %s)",
+                (vio_id, assigned_veh['vehicle_id'], camera_id,
+                 v['type'], date_str, v['confidence'])
+            )
             
-            # Heuristic triggers tailored for demo visibility
-            if frame_count % int(fps*1) == 0: # Check every second
-                if moto_found:
-                    violation_type = 'Helmetless Riding'
-                    conf_score = 88
-                elif car_found and light_found:
-                    violation_type = 'Signal Jumping'
-                    conf_score = 92
-                elif car_found and frame_count % int(fps*10) == 0:
-                    violation_type = 'Overspeeding'
-                    conf_score = 85
-                elif car_found and frame_count % int(fps*20) == 0:
-                    violation_type = 'Illegal Parking'
-                    conf_score = 95
-                
-            if violation_type and vehicles:
-                # Randomly assign a vehicle from DB to the detection
-                import random
-                assigned_veh = random.choice(vehicles)
-                
-                det = {
-                    'type': violation_type,
-                    'confidence': conf_score,
-                    'timestamp': frame_count / fps,
-                    'camera_id': camera_id,
-                    'vehicle_id': assigned_veh['vehicle_id'],
-                    'vehicle_reg': assigned_veh['reg_no']
-                }
-                detections.append(det)
-
-                # Overlay violation alert on video
-                cv2.putText(frame, f"VIOLATION: {violation_type}!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-
-            out.write(frame)
+            fin_id = f"FIN-{str(curr_fin_num).zfill(3)}"
+            curr_fin_num += 1
             
+            amount = fine_amounts.get(v['type'], 500)
+            cursor.execute(
+                "INSERT INTO fines VALUES (%s, %s, %s, %s)",
+                (fin_id, vio_id, amount, 'Unpaid')
+            )
+            saved.append({
+                **v,
+                'violation_id': vio_id,
+                'fine_id':      fin_id,
+                'amount':       amount,
+                'vehicle_id':   assigned_veh['vehicle_id'],
+                'vehicle_reg':  assigned_veh['reg_no'],
+            })
+        conn.commit()
+        conn.close()
+
+        processing_jobs[job_id].update({
+            'status':       'completed',
+            'progress':     100,
+            'output_video': out_filename,
+            'detections':   saved,
+        })
+        print(f"[Detector] Done — {len(saved)} violation(s) saved for job {job_id}")
+
     except Exception as e:
-        print(f"Error processing video: {str(e)}")
         import traceback
         traceback.print_exc()
-        processing_jobs[job_id]['status'] = 'error'
+        processing_jobs[job_id]['status']  = 'error'
         processing_jobs[job_id]['message'] = str(e)
-    finally:
-        if 'cap' in locals(): cap.release()
-        if 'out' in locals(): out.release()
-
-    # Save detections to Database
-    saved_detections = []
-    if processing_jobs[job_id]['status'] != 'error':
-        try:
-            conn = get_db()
-            fine_amounts = {
-                'Signal Jumping': 1000, 'Overspeeding': 2000, 'Helmetless Riding': 500,
-                'Illegal Parking': 500, 'Lane Violation': 1000, 'Wrong Way Driving': 2000,
-                'Using Mobile Phone': 1500, 'Accident': 5000,
-            }
-            
-            for det in detections:
-                vio_id = next_id('violations', 'VIO')
-                date_str = time.strftime('%Y-%m-%d')
-                conn.execute("INSERT INTO violations VALUES (?, ?, ?, ?, ?, ?)",
-                             (vio_id, det['vehicle_id'], det['camera_id'], det['type'], date_str, det['confidence']))
-                             
-                fin_id = next_id('fines', 'FIN')
-                amount = fine_amounts.get(det['type'], 500)
-                conn.execute("INSERT INTO fines VALUES (?, ?, ?, ?)",
-                             (fin_id, vio_id, amount, 'Unpaid'))
-                             
-                det['violation_id'] = vio_id
-                det['fine_id'] = fin_id
-                det['amount'] = amount
-                saved_detections.append(det)
-                
-            conn.commit()
-            conn.close()
-
-            processing_jobs[job_id]['status'] = 'completed'
-            processing_jobs[job_id]['progress'] = 100
-            processing_jobs[job_id]['output_video'] = output_filename
-            processing_jobs[job_id]['detections'] = saved_detections
-        except Exception as db_err:
-            print(f"Database error: {str(db_err)}")
-            processing_jobs[job_id]['status'] = 'error'
-            processing_jobs[job_id]['message'] = f"Database error: {str(db_err)}"
 
 @app.route('/api/process-video', methods=['POST'])
 def process_video():
@@ -1033,6 +1125,7 @@ def serve_video(type, filename):
 def list_unpaid_fines():
     owner_id = request.args.get('owner_id')
     conn = get_db()
+    cursor = conn.cursor()
     query = """
         SELECT f.*, v.type as violation_type, veh.reg_no as vehicle_reg
         FROM fines f
@@ -1042,12 +1135,15 @@ def list_unpaid_fines():
     """
     params = []
     if owner_id:
-        query += " AND veh.owner_id = ?"
+        query += " AND veh.owner_id = %s"
         params.append(owner_id)
     query += " ORDER BY f.fine_id"
-    rows = conn.execute(query, params).fetchall()
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    res = dict_rows(rows, cursor.column_names)
+    cursor.close()
     conn.close()
-    return jsonify(dict_rows(rows))
+    return jsonify(res)
 
 
 # ============================================
@@ -1061,7 +1157,7 @@ if __name__ == '__main__':
     init_db()
     migrate_schema()
     seed_data()
-    print(f"✓ Database: {DB_PATH}")
+    print(f"✓ Database: MySQL (host: {MYSQL_CONFIG['host']}, db: {MYSQL_CONFIG['database']})")
     print(f"✓ Server starting at http://localhost:5000")
     print("=" * 50)
     app.run(debug=True, port=5000)

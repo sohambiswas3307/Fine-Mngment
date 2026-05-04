@@ -17,13 +17,15 @@
         <div class="login-card">
             <div class="logo" style="margin-bottom: 24px; justify-content: center;">
                 <div class="logo-icon">
-                    <img src="logo.png" alt="E Parivahan Logo" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">
+                    <img src="logo.png" alt="E Parivahan Logo" style="width: 100%; height: 100%; border-radius: 16px; object-fit: cover;">
                 </div>
                 <div class="logo-text">
                     <span class="logo-title">E Parivahan</span>
                 </div>
             </div>
-            <p class="login-desc" style="text-align: center; color: var(--text-muted); margin-bottom: 32px;">Sign in to access your traffic portal.</p>
+            <p class="login-desc" id="login-desc" style="text-align: center; color: var(--text-muted); margin-bottom: 32px;">Sign in to access your traffic portal.</p>
+            
+            <!-- Login Form -->
             <form id="login-form">
                 <div class="form-group">
                     <label>Username</label>
@@ -35,6 +37,64 @@
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Login to Dashboard</button>
             </form>
+
+            <!-- Register Form (Hidden) -->
+            <form id="register-form" class="hidden" style="display: none;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="reg-username" placeholder="Pick a username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="reg-password" placeholder="••••••••" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" placeholder="Enter your full name" required>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label>Driving License No</label>
+                        <input type="text" id="reg-license" placeholder="DL-XXXXXXX" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="text" id="reg-phone" placeholder="9876543210" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="reg-email" placeholder="you@example.com" required>
+                </div>
+                <div class="nav-divider" style="margin: 16px 0;"></div>
+                <p style="font-size: 0.75rem; color: var(--brand-primary); font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Vehicle Details</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label>Registration No</label>
+                        <input type="text" id="reg-veh-no" placeholder="DL-01-XX-0000" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Vehicle Type</label>
+                        <select id="reg-veh-type" required>
+                            <option value="Car">Car</option>
+                            <option value="Motorcycle">Motorcycle</option>
+                            <option value="Truck">Truck</option>
+                            <option value="Auto">Auto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Vehicle Color</label>
+                    <input type="text" id="reg-veh-color" placeholder="e.g. White, Black" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">Create Account</button>
+            </form>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="#" id="toggle-register" style="color: var(--brand-primary); font-size: 0.875rem; text-decoration: none;">Don't have an account? Register now</a>
+            </div>
             <div class="demo-hints" style="margin-top: 30px; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px; font-size: 0.8125rem;">
                 <p style="color: var(--text-muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Demo Credentials:</p>
                 <p style="display: flex; justify-content: space-between;"><span>Admin:</span> <code>admin / admin123</code></p>
@@ -50,7 +110,7 @@
         <div class="sidebar-brand">
             <div class="sidebar-brand-left">
                 <div class="logo-icon logo-icon--sm">
-                    <img src="logo.png" alt="" width="40" height="40" style="border-radius: 12px; object-fit: cover;">
+                    <img src="logo.png" alt="E Parivahan Logo" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">
                 </div>
                 <span class="sidebar-brand-title">E Parivahan</span>
             </div>
@@ -103,10 +163,6 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 <span>Violations</span>
             </a>
-            <a href="#accident-alerts" class="nav-item" data-page="accident-alerts" id="nav-accident-alerts">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><circle cx="12" cy="17" r="1"/><path d="M12 13V9"/></svg>
-                <span>Accident Alerts</span>
-            </a>
             <a href="#fines" class="nav-item" data-page="fines" id="nav-fines">
                 <svg class="icon-rupee" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17" font-size="15" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
                 <span>Fines</span>
@@ -151,13 +207,13 @@
                     </div>
                     <div class="mosaic-card mosaic-reminders dashboard-user-only" id="daily-reminders-card">
                         <div class="mosaic-calendar-head">
-                            <span class="mosaic-calendar-title">Daily reminders</span>
-                            <button type="button" class="mosaic-toggle" id="reminders-show-done-toggle" aria-pressed="false" aria-label="Show completed reminders" title="Show completed"></button>
+                            <span class="mosaic-calendar-title">Set reminder</span>
+                            <button type="button" class="mosaic-toggle" id="reminders-show-done-toggle" aria-pressed="false" aria-label="Toggle completed reminders"></button>
                         </div>
                         <div class="reminders-week" id="reminders-week" role="tablist" aria-label="Pick day"></div>
                         <div class="reminders-add">
-                            <input type="text" id="reminder-text-input" class="reminders-input" placeholder="Add a reminder…" maxlength="240" autocomplete="off">
-                            <button type="button" class="reminders-add-btn" id="reminder-add-btn">Add</button>
+                            <input type="text" id="reminder-text-input" class="reminders-input" placeholder="What's on your mind?…" maxlength="240" autocomplete="off">
+                            <button type="button" class="reminders-add-btn" id="reminder-add-btn">Set</button>
                         </div>
                         <ul class="reminders-list" id="reminders-list"></ul>
                     </div>
@@ -183,7 +239,7 @@
                             <a href="#fines" class="mosaic-send-btn">Pay fines</a>
                         </div>
                     </div>
-                    <div class="mosaic-pair mosaic-pair--bottom">
+                    <div class="mosaic-pair mosaic-pair--bottom dashboard-admin-only hidden">
                         <div class="mosaic-card mosaic-detail">
                             <h3 class="mosaic-detail-title">Collection rate</h3>
                             <p class="mosaic-detail-name" id="dashboard-user-role-label">Administrator</p>
@@ -193,28 +249,24 @@
                             </div>
                             <span class="mosaic-detail-pct" id="dashboard-clearance-pct">0%</span>
                         </div>
-                        <div class="mosaic-card mosaic-donut-wrap">
-                            <div class="mosaic-donut" id="dashboard-donut" style="--donut-pct: 0deg;">
-                                <div class="mosaic-donut-hole">
-                                    <span class="mosaic-donut-value" id="dashboard-donut-label">0%</span>
-                                </div>
+                        <div class="mosaic-card mosaic-revenue">
+                            <div class="mosaic-revenue-icon" aria-hidden="true">
+                                <svg class="icon-rupee icon-rupee--lg" width="22" height="22" viewBox="0 0 24 24"><text x="12" y="17.5" font-size="16" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
                             </div>
-                            <div class="mosaic-donut-legend">
-                                <p class="mosaic-donut-legend-item"><span class="mosaic-donut-legend-dot" style="background: var(--brand-primary); width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>Collected fines</p>
+                            <div class="mosaic-revenue-body">
+                                <span class="mosaic-revenue-label" id="stat-fines-collected-label">Fines collected</span>
+                                <span class="mosaic-revenue-value" id="stat-fines-collected">₹0</span>
+                                <div class="mosaic-progress-track">
+                                    <div class="mosaic-progress-fill" id="dashboard-collection-bar" style="width: 0%"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="mosaic-card mosaic-revenue">
-                        <div class="mosaic-revenue-icon" aria-hidden="true">
-                            <svg class="icon-rupee icon-rupee--lg" width="22" height="22" viewBox="0 0 24 24"><text x="12" y="17.5" font-size="16" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
+                    <div class="card violation-chart-card dashboard-admin-only hidden" style="margin-top: 16px; margin-bottom: 0;">
+                        <div class="card-header" style="padding: 16px 24px;">
+                            <h2 style="font-size: 1rem;">Violation Types</h2>
                         </div>
-                        <div class="mosaic-revenue-body">
-                            <span class="mosaic-revenue-label" id="stat-fines-collected-label">Fines collected</span>
-                            <span class="mosaic-revenue-value" id="stat-fines-collected">₹0</span>
-                            <div class="mosaic-progress-track">
-                                <div class="mosaic-progress-fill" id="dashboard-collection-bar" style="width: 0%"></div>
-                            </div>
-                        </div>
+                        <div class="chart-area" id="violation-chart" style="min-height: 200px; padding: 12px;"></div>
                     </div>
                 </div>
             </div>
@@ -238,40 +290,6 @@
                             </thead>
                             <tbody id="dashboard-violations-body"></tbody>
                         </table>
-                    </div>
-                </div>
-                <div class="card violation-chart-card">
-                    <div class="card-header">
-                        <h2>Violation Types</h2>
-                    </div>
-                    <div class="chart-area" id="violation-chart"></div>
-                </div>
-                <div class="mosaic-pair">
-                    <div class="mosaic-card mosaic-spot">
-                        <h3 class="mosaic-spot-title" id="mosaic-dash-left-title">Registered owners</h3>
-                        <p class="mosaic-spot-sub" id="mosaic-dash-left-sub">In the system</p>
-                        <div class="mosaic-avatars" id="mosaic-dash-left-avatars" aria-hidden="true">
-                            <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
-                        </div>
-                        <div class="mosaic-tags" id="mosaic-dash-left-tags">
-                            <span class="mosaic-tag mosaic-tag--purple">People</span>
-                            <span class="mosaic-tag">KYC</span>
-                            <span class="mosaic-tag mosaic-tag--purple">ID</span>
-                        </div>
-                        <p class="mosaic-spot-metric"><span id="stat-cameras">0</span> <span id="mosaic-dash-left-suffix">owners</span></p>
-                    </div>
-                    <div class="mosaic-card mosaic-spot">
-                        <h3 class="mosaic-spot-title" id="mosaic-dash-right-title">Registered vehicles</h3>
-                        <p class="mosaic-spot-sub" id="mosaic-dash-right-sub">Linked to owners</p>
-                        <div class="mosaic-avatars" id="mosaic-dash-right-avatars" aria-hidden="true">
-                            <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
-                        </div>
-                        <div class="mosaic-tags" id="mosaic-dash-right-tags">
-                            <span class="mosaic-tag mosaic-tag--purple">RC</span>
-                            <span class="mosaic-tag">Fleet</span>
-                            <span class="mosaic-tag mosaic-tag--purple">Reg</span>
-                        </div>
-                        <p class="mosaic-spot-metric"><span id="stat-violations">0</span> <span id="mosaic-dash-right-suffix">vehicles</span></p>
                     </div>
                 </div>
             </div>
@@ -356,7 +374,7 @@
                     <p class="page-subtitle">Manage AI-enabled traffic surveillance cameras</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-primary" id="btn-add-camera">
+                    <button class="btn btn-primary" id="btn-add-camera" data-role="Admin">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         Add Camera
                     </button>
@@ -370,7 +388,7 @@
                                 <th>Camera ID</th>
                                 <th>Location</th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th data-role="Admin">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="cameras-body"></tbody>
@@ -387,7 +405,7 @@
                     <p class="page-subtitle">Manage vehicle owner records and license details</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-primary" id="btn-add-owner">
+                    <button class="btn btn-primary" id="btn-add-owner" data-role="Admin">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         Add Owner
                     </button>
@@ -403,7 +421,7 @@
                                 <th>License No</th>
                                 <th>Phone</th>
                                 <th>Email</th>
-                                <th>Actions</th>
+                                <th data-role="Admin">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="owners-body"></tbody>
@@ -420,7 +438,7 @@
                     <p class="page-subtitle">Track registered vehicles linked to owners</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-primary" id="btn-add-vehicle">
+                    <button class="btn btn-primary" id="btn-add-vehicle" data-role="Admin">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         Add Vehicle
                     </button>
@@ -436,7 +454,7 @@
                                 <th>Type</th>
                                 <th>Color</th>
                                 <th>Owner</th>
-                                <th>Actions</th>
+                                <th data-role="Admin">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="vehicles-body"></tbody>
@@ -453,7 +471,7 @@
                     <p class="page-subtitle">All detected traffic violations</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-primary" id="btn-add-violation">
+                    <button class="btn btn-primary" id="btn-add-violation" data-role="Admin">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         Log Violation
                     </button>
@@ -469,7 +487,6 @@
                     <button class="tab" data-type="Lane Violation">Lane Violation</button>
                     <button class="tab" data-type="Wrong Way Driving">Wrong Way Driving</button>
                     <button class="tab" data-type="Using Mobile Phone">Using Mobile Phone</button>
-                    <button class="tab" data-type="Accident">Accident Alerts</button>
                 </div>
                 <div class="table-wrapper">
                     <table class="data-table" id="violations-table">
@@ -481,7 +498,7 @@
                                 <th>Type</th>
                                 <th>Date</th>
                                 <th>Fine Status</th>
-                                <th>Actions</th>
+                                <th data-role="Admin">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="violations-body"></tbody>
@@ -490,46 +507,6 @@
             </div>
         </section>
 
-        <!-- ===== ACCIDENT ALERTS PAGE ===== -->
-        <section class="page" id="page-accident-alerts">
-            <div class="page-header">
-                <div>
-                    <h1>Accident Alerts</h1>
-                    <p class="page-subtitle">Monitor and manage accident reports</p>
-                </div>
-            </div>
-            <div class="card">
-                <div class="accident-summary-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                    <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                        <div class="accident-value" id="accident-reported" style="font-size: 1.75rem; font-weight: 700;">0</div>
-                        <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Reported</div>
-                    </div>
-                    <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                        <div class="accident-value" id="accident-injuries" style="font-size: 1.75rem; font-weight: 700;">0</div>
-                        <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Injuries</div>
-                    </div>
-                    <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                        <div class="accident-value" id="accident-resolved" style="font-size: 1.75rem; font-weight: 700;">0</div>
-                        <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Resolved</div>
-                    </div>
-                </div>
-                <div class="table-wrapper">
-                    <table class="data-table" id="accident-alerts-table">
-                        <thead>
-                            <tr>
-                                <th>Violation ID</th>
-                                <th>Vehicle</th>
-                                <th>Camera</th>
-                                <th>Date</th>
-                                <th>Fine Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="accident-alerts-body"></tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
 
         <!-- ===== FINES PAGE ===== -->
         <section class="page" id="page-fines">
@@ -574,7 +551,7 @@
                     <p class="page-subtitle">Track all fine payments and transaction details</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-primary" id="btn-add-payment">
+                    <button class="btn btn-primary" id="btn-add-payment" data-role="Admin">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         Record Payment
                     </button>

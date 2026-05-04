@@ -33,7 +33,7 @@ async function api(endpoint, method = 'GET', body = null) {
 const FINE_AMOUNTS = {
     'Signal Jumping': 1000, 'Overspeeding': 2000, 'Helmetless Riding': 500,
     'Illegal Parking': 500, 'Lane Violation': 1000, 'Wrong Way Driving': 2000,
-    'Using Mobile Phone': 1500, 'Accident': 5000,
+    'Using Mobile Phone': 1500,
 };
 const VIOLATION_TYPES = Object.keys(FINE_AMOUNTS);
 
@@ -215,9 +215,7 @@ const DailyReminders = {
 
         if (list.length === 0) {
             this.listEl.innerHTML =
-                '<li class="reminders-empty">No reminders for this day' +
-                (this.showDone ? '' : ' (completed hidden)') +
-                '.</li>';
+                '<li class="reminders-empty">No reminders for this day.</li>';
             return;
         }
 
@@ -276,7 +274,32 @@ function showToast(msg, type = 'success') {
 const Auth = {
     init() {
         const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
         const logoutBtn = document.getElementById('logout-btn');
+        const toggleBtn = document.getElementById('toggle-register');
+        const loginDesc = document.getElementById('login-desc');
+
+        if (toggleBtn) {
+            toggleBtn.onclick = (e) => {
+                e.preventDefault();
+                const isLogin = !loginForm.classList.contains('hidden');
+                if (isLogin) {
+                    loginForm.classList.add('hidden');
+                    loginForm.style.display = 'none';
+                    registerForm.classList.remove('hidden');
+                    registerForm.style.display = 'block';
+                    toggleBtn.textContent = 'Already have an account? Login';
+                    loginDesc.textContent = 'Create your E Parivahan account.';
+                } else {
+                    loginForm.classList.remove('hidden');
+                    loginForm.style.display = 'block';
+                    registerForm.classList.add('hidden');
+                    registerForm.style.display = 'none';
+                    toggleBtn.textContent = "Don't have an account? Register now";
+                    loginDesc.textContent = 'Sign in to access your traffic portal.';
+                }
+            };
+        }
 
         if (loginForm) {
             loginForm.onsubmit = async (e) => {
@@ -296,6 +319,35 @@ const Auth = {
                     }
                 } catch (err) {
                     showToast('Connection error', 'error');
+                }
+            };
+        }
+
+        if (registerForm) {
+            registerForm.onsubmit = async (e) => {
+                e.preventDefault();
+                const data = {
+                    username:      document.getElementById('reg-username').value,
+                    password:      document.getElementById('reg-password').value,
+                    name:          document.getElementById('reg-name').value,
+                    license_no:    document.getElementById('reg-license').value,
+                    phone:         document.getElementById('reg-phone').value,
+                    email:         document.getElementById('reg-email').value,
+                    vehicle_reg:   document.getElementById('reg-veh-no').value,
+                    vehicle_type:  document.getElementById('reg-veh-type').value,
+                    vehicle_color: document.getElementById('reg-veh-color').value
+                };
+
+                try {
+                    const res = await api('/register', 'POST', data);
+                    if (res.success) {
+                        showToast('Account created! You can now login.', 'success');
+                        toggleBtn.click(); // Switch back to login
+                    } else {
+                        showToast(res.message, 'error');
+                    }
+                } catch (err) {
+                    showToast('Registration failed', 'error');
                 }
             };
         }
@@ -332,8 +384,8 @@ const Auth = {
 
             syncSidebarStatLabels(user.role === 'Admin');
 
-            // Restricted menu items
-            document.querySelectorAll('.nav-item[data-role="Admin"]').forEach(item => {
+            // Restricted elements (menu items and buttons)
+            document.querySelectorAll('[data-role="Admin"]').forEach(item => {
                 item.style.display = user.role === 'Admin' ? 'flex' : 'none';
             });
         } else {
@@ -454,13 +506,20 @@ const AdminFineMap = {
         const el = document.getElementById('leaflet-fine-map');
         if (!el || this.map) return;
         const [lat, lng] = [12.9716, 77.5946];
-        this.map = L.map(el, { scrollWheelZoom: true }).setView([lat, lng], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-            maxZoom: 19,
+        this.map = L.map(el, { scrollWheelZoom: true, zoomControl: false }).setView([lat, lng], 12);
+        
+        // Using CartoDB Dark Matter - High quality, free, no key needed
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
         }).addTo(this.map);
+
+        L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+
         this.markersLayer = L.layerGroup().addTo(this.map);
         this.map.whenReady(() => this.map.invalidateSize());
+        
         if (this.pollTimer) clearInterval(this.pollTimer);
         this.pollTimer = setInterval(() => {
             const page = (location.hash || '#dashboard').replace(/^#/, '') || 'dashboard';
@@ -479,49 +538,51 @@ const AdminFineMap = {
             if (!res.ok) return;
             const data = await res.json();
             if (!data.ok || !data.points) return;
+            
             const city = data.city || {};
             if (city.center && Array.isArray(city.center)) {
                 this.map.setView(city.center, city.defaultZoom || 12);
             }
+            
             this.markersLayer.clearLayers();
             if (this.heatLayer) {
                 this.map.removeLayer(this.heatLayer);
                 this.heatLayer = null;
             }
-            const heatPts = [];
-            data.points.forEach((p) => {
-                const intensity = Math.max(0.12, p.heat || 0);
-                heatPts.push([p.lat, p.lng, intensity]);
-            });
+
+            const heatPts = data.points.map(p => [p.lat, p.lng, Math.max(0.12, p.heat || 0)]);
             if (typeof L.heatLayer === 'function' && heatPts.length) {
                 this.heatLayer = L.heatLayer(heatPts, {
-                    radius: 42,
-                    blur: 22,
+                    radius: 35,
+                    blur: 20,
                     maxZoom: 17,
-                    max: 1.0,
-                    gradient: { 0.35: '#4b39b5', 0.6: '#ff5f6d', 1: '#ff2d43' },
-                });
-                this.heatLayer.addTo(this.map);
+                    gradient: { 0.4: '#4b39b5', 0.65: '#ff5f6d', 1: '#ff2d43' }
+                }).addTo(this.map);
             }
+
             data.points.forEach((p) => {
-                const r = 6 + Math.min(28, (p.violations || 0) * 4);
+                const r = 8 + Math.min(30, (p.violations || 0) * 3);
                 const circle = L.circleMarker([p.lat, p.lng], {
                     radius: r,
                     color: '#ff5f6d',
                     fillColor: '#4b39b5',
-                    fillOpacity: 0.28,
+                    fillOpacity: 0.25,
                     weight: 2,
                 });
                 const pending = Number(p.pendingAmount || 0).toLocaleString('en-IN');
                 circle.bindPopup(
-                    `<strong>${escapeHtml(p.location)}</strong><br/>` +
-                    `Violations: ${p.violations}<br/>` +
-                    `Fines recorded: ${p.finesTotal}<br/>` +
-                    `Unpaid fines: ${p.finesUnpaid} (₹${pending})`
+                    `<div style="color: #111827; font-family: Poppins, sans-serif;">
+                        <strong style="display: block; margin-bottom: 4px;">${p.location}</strong>
+                        <div style="font-size: 11px;">
+                            Violations: ${p.violations}<br/>
+                            Fines: ${p.finesTotal}<br/>
+                            Unpaid: ${p.finesUnpaid} (₹${pending})
+                        </div>
+                    </div>`
                 );
                 circle.addTo(this.markersLayer);
             });
-            if (this.markersLayer.bringToFront) this.markersLayer.bringToFront();
+
             const updatedEl = document.getElementById('admin-map-updated');
             if (updatedEl) updatedEl.textContent = new Date().toLocaleTimeString();
         } catch (e) {
@@ -692,6 +753,11 @@ async function renderDashboard() {
         syncSidebarStatLabels(isAdmin);
         applyDashboardMosaicLayout(isAdmin, stats);
 
+        const grid = document.querySelector('.dashboard-grid');
+        if (grid) {
+            grid.classList.toggle('dashboard-grid--full', !isAdmin);
+        }
+
         const revenueLabel = document.getElementById('stat-fines-collected-label');
         const revenueValue = document.getElementById('stat-fines-collected');
         if (isAdmin) {
@@ -721,26 +787,46 @@ async function renderDashboard() {
         const bar = document.getElementById('dashboard-collection-bar');
         const clearBar = document.getElementById('dashboard-clearance-bar');
         const clearPct = document.getElementById('dashboard-clearance-pct');
-        const donut = document.getElementById('dashboard-donut');
-        const donutLbl = document.getElementById('dashboard-donut-label');
         if (bar) bar.style.width = `${collectionPct}%`;
         if (clearBar) clearBar.style.width = `${collectionPct}%`;
         if (clearPct) clearPct.textContent = `${collectionPct}%`;
-        if (donut) donut.style.setProperty('--donut-end', `${(collectionPct / 100) * 360}deg`);
-        if (donutLbl) donutLbl.textContent = `${collectionPct}%`;
-        const donutCap = document.getElementById('dashboard-donut-caption');
-        if (donutCap) {
-            donutCap.textContent = totalMoney <= 0
-                ? 'No fine volume yet'
-                : `${collectionPct}% of collected + pending total`;
-        }
 
         const greet = document.getElementById('balance-greeting-name');
         if (user && greet) greet.textContent = user.username;
         const roleLbl = document.getElementById('dashboard-user-role-label');
-        if (user && roleLbl) roleLbl.textContent = user.role === 'Admin' ? 'Administrator' : 'Vehicle owner';
+        if (user && roleLbl) {
+            roleLbl.textContent = user.role === 'Admin' ? 'Administrator' : 'Vehicle owner';
+        }
+
+        // Update sidebar with license no if not admin
+        if (!isAdmin && stats.licenseNo) {
+            const sidebarRole = document.querySelector('.user-role');
+            if (sidebarRole) sidebarRole.textContent = `License: ${stats.licenseNo}`;
+            
+            // Add click listener for profile modal
+            const profileCard = document.querySelector('.sidebar-profile-card');
+            if (profileCard) {
+                profileCard.style.cursor = 'pointer';
+                profileCard.onclick = () => {
+                    Modal.open('User Profile', [
+                        { key: 'u', label: 'Username', readonly: true },
+                        { key: 'l', label: 'Driving License', readonly: true },
+                        { key: 'r', label: 'Role', readonly: true }
+                    ], {
+                        u: user.username,
+                        l: stats.licenseNo,
+                        r: 'Vehicle Owner'
+                    }, () => Modal.close());
+                };
+            }
+        }
 
         // Recent violations
+        const vioHeader = document.querySelector('.recent-violations-card h2');
+        if (vioHeader) {
+            vioHeader.textContent = isAdmin ? 'Recent Violations' : 'My Violations';
+        }
+
         const tbody = document.getElementById('dashboard-violations-body');
         const recent = stats.recentViolations || [];
         if (recent.length === 0) {
@@ -773,39 +859,6 @@ async function renderDashboard() {
 
 function renderViolationChart(typeCounts, selectedType = 'all') {
     const chartArea = document.getElementById('violation-chart');
-    if (selectedType === 'Accident') {
-        // Render accident alerts summary
-        (async () => {
-            try {
-                const violations = await api('/violations');
-                const accidents = violations.filter(v => v.type === 'Accident');
-                const reported = accidents.length;
-                const resolved = accidents.filter(v => v.fine_status === 'Paid').length;
-                const injuries = 0; // Placeholder
-                const html = `
-                    <p class="text-muted" style="margin: 0 0 1rem;">${reported} accident${reported > 1 ? 's' : ''} reported.</p>
-                    <div class="accident-summary-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem;">
-                        <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                            <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">${reported}</div>
-                            <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Reported</div>
-                        </div>
-                        <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                            <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">${injuries}</div>
-                            <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Injuries</div>
-                        </div>
-                        <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                            <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">${resolved}</div>
-                            <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Resolved</div>
-                        </div>
-                    </div>
-                `;
-                chartArea.innerHTML = html;
-            } catch (err) {
-                chartArea.innerHTML = '<div class="empty-state small"><p>Error loading accident alerts</p></div>';
-            }
-        })();
-        return;
-    }
 
     let filteredCounts = typeCounts;
     if (selectedType !== 'all') {
@@ -836,65 +889,6 @@ function renderViolationChart(typeCounts, selectedType = 'all') {
     }).join('');
 }
 
-async function renderAccidentAlerts() {
-    try {
-        const violations = await api('/violations');
-        const accidents = violations.filter(v => v.type === 'Accident');
-        const reported = accidents.length;
-        const resolved = accidents.filter(v => v.fine_status === 'Paid').length;
-        const injuries = 0; // Placeholder, as no injury data
-
-        document.querySelector('.accident-value:nth-child(1)').textContent = reported;
-        document.querySelector('.accident-value:nth-child(2)').textContent = injuries;
-        document.querySelector('.accident-value:nth-child(3)').textContent = resolved;
-
-        const alertText = document.querySelector('.accident-alerts-card p');
-        if (reported > 0) {
-            alertText.textContent = `${reported} accident${reported > 1 ? 's' : ''} reported.`;
-        } else {
-            alertText.textContent = 'No accident reports are currently registered.';
-        }
-    } catch (err) {
-        console.error('Accident alerts error:', err);
-    }
-}
-
-async function renderAccidentAlertsPage() {
-    try {
-        const violations = await api('/violations');
-        const accidents = violations.filter(v => v.type === 'Accident');
-        const reported = accidents.length;
-        const resolved = accidents.filter(v => v.fine_status === 'Paid').length;
-        const injuries = 0; // Placeholder
-
-        document.getElementById('accident-reported').textContent = reported;
-        document.getElementById('accident-injuries').textContent = injuries;
-        document.getElementById('accident-resolved').textContent = resolved;
-
-        const tbody = document.getElementById('accident-alerts-body');
-        if (accidents.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-state small"><p>No accident alerts recorded</p></td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = accidents.map(v => {
-            const badgeClass = v.fine_status === 'Paid' ? 'badge-success' : 'badge-danger';
-            return `<tr>
-                <td><strong>${v.violation_id}</strong></td>
-                <td>${v.vehicle_reg || v.vehicle_id}</td>
-                <td>${v.camera_location || v.camera_id}</td>
-                <td>${v.date}</td>
-                <td><span class="badge ${badgeClass}">${v.fine_status}</span></td>
-                <td>
-                    <button class="btn-icon delete" onclick="deleteViolation('${v.violation_id}')" title="Delete">✕</button>
-                </td>
-            </tr>`;
-        }).join('');
-    } catch (err) {
-        showToast('Failed to load accident alerts', 'error');
-    }
-}
-
 // ============================================
 // CAMERAS
 // ============================================
@@ -906,15 +900,20 @@ async function renderCameras() {
             tbody.innerHTML = '<tr><td colspan="4" class="empty-state small"><p>No cameras added yet</p></td></tr>';
             return;
         }
-        tbody.innerHTML = cameras.map(c => `<tr>
-            <td><strong>${c.camera_id}</strong></td>
-            <td>${c.location}</td>
-            <td><span class="badge badge-success">${c.status || 'Active'}</span></td>
-            <td>
+        const user = Auth.getUser();
+        const isAdmin = user && user.role === 'Admin';
+        tbody.innerHTML = cameras.map(c => {
+            const actionsCell = isAdmin ? `<td>
                 <button class="btn-icon" onclick="editCamera('${c.camera_id}')" title="Edit">✎</button>
                 <button class="btn-icon delete" onclick="deleteCamera('${c.camera_id}')" title="Delete">✕</button>
-            </td>
-        </tr>`).join('');
+            </td>` : '';
+            return `<tr>
+                <td><strong>${c.camera_id}</strong></td>
+                <td>${c.location}</td>
+                <td><span class="badge badge-success">${c.status || 'Active'}</span></td>
+                ${actionsCell}
+            </tr>`;
+        }).join('');
     } catch (err) {
         showToast('Failed to load cameras', 'error');
     }
@@ -970,17 +969,22 @@ async function renderOwners() {
             tbody.innerHTML = '<tr><td colspan="6" class="empty-state small"><p>No owners registered</p></td></tr>';
             return;
         }
-        tbody.innerHTML = owners.map(o => `<tr>
-            <td><strong>${o.owner_id}</strong></td>
-            <td>${o.name}</td>
-            <td>${o.license_no}</td>
-            <td>${o.phone}</td>
-            <td>${o.email}</td>
-            <td>
+        const user = Auth.getUser();
+        const isAdmin = user && user.role === 'Admin';
+        tbody.innerHTML = owners.map(o => {
+            const actionsCell = isAdmin ? `<td>
                 <button class="btn-icon" onclick="editOwner('${o.owner_id}')" title="Edit">✎</button>
                 <button class="btn-icon delete" onclick="deleteOwner('${o.owner_id}')" title="Delete">✕</button>
-            </td>
-        </tr>`).join('');
+            </td>` : '';
+            return `<tr>
+                <td><strong>${o.owner_id}</strong></td>
+                <td>${o.name}</td>
+                <td>${o.license_no}</td>
+                <td>${o.phone}</td>
+                <td>${o.email}</td>
+                ${actionsCell}
+            </tr>`;
+        }).join('');
     } catch (err) {
         showToast('Failed to load owners', 'error');
     }
@@ -1036,17 +1040,22 @@ async function renderVehicles() {
             tbody.innerHTML = '<tr><td colspan="6" class="empty-state small"><p>No vehicles registered</p></td></tr>';
             return;
         }
-        tbody.innerHTML = vehicles.map(v => `<tr>
-            <td><strong>${v.vehicle_id}</strong></td>
-            <td>${v.reg_no}</td>
-            <td>${v.type}</td>
-            <td>${v.color}</td>
-            <td>${v.owner_name || v.owner_id}</td>
-            <td>
+        const user = Auth.getUser();
+        const isAdmin = user && user.role === 'Admin';
+        tbody.innerHTML = vehicles.map(v => {
+            const actionsCell = isAdmin ? `<td>
                 <button class="btn-icon" onclick="editVehicle('${v.vehicle_id}')" title="Edit">✎</button>
                 <button class="btn-icon delete" onclick="deleteVehicle('${v.vehicle_id}')" title="Delete">✕</button>
-            </td>
-        </tr>`).join('');
+            </td>` : '';
+            return `<tr>
+                <td><strong>${v.vehicle_id}</strong></td>
+                <td>${v.reg_no}</td>
+                <td>${v.type}</td>
+                <td>${v.color}</td>
+                <td>${v.owner_name || v.owner_id}</td>
+                ${actionsCell}
+            </tr>`;
+        }).join('');
     } catch (err) {
         showToast('Failed to load vehicles', 'error');
     }
@@ -1119,8 +1128,16 @@ async function renderViolations(typeFilter = currentViolationFilter) {
             tbody.innerHTML = '<tr><td colspan="7" class="empty-state small"><p>No violations found</p></td></tr>';
             return;
         }
+        const user = Auth.getUser();
+        const isAdmin = user && user.role === 'Admin';
         tbody.innerHTML = filtered.map(v => {
             const badgeClass = v.fine_status === 'Paid' ? 'badge-success' : 'badge-danger';
+            const actionsCell = isAdmin ? `<td>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-sm btn-outline" onclick="viewViolationDetails('${v.violation_id}')">Details</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteViolation('${v.violation_id}')" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);">Cancel</button>
+                </div>
+            </td>` : '';
             return `<tr>
                 <td><strong>${v.violation_id}</strong></td>
                 <td>${v.vehicle_reg || v.vehicle_id}</td>
@@ -1128,9 +1145,7 @@ async function renderViolations(typeFilter = currentViolationFilter) {
                 <td>${v.type}</td>
                 <td>${v.date}</td>
                 <td><span class="badge ${badgeClass}">${v.fine_status}</span></td>
-                <td>
-                    <button class="btn-icon delete" onclick="deleteViolation('${v.violation_id}')" title="Delete">✕</button>
-                </td>
+                ${actionsCell}
             </tr>`;
         }).join('');
 
@@ -1164,11 +1179,29 @@ async function getViolationFields() {
     ];
 }
 
+window.viewViolationDetails = async function(id) {
+    try {
+        const violations = await api('/violations');
+        const v = violations.find(item => item.violation_id === id);
+        if (!v) return;
+
+        Modal.open('Violation Details', [
+            { key: 'violation_id', label: 'Violation ID', readonly: true },
+            { key: 'camera_id', label: 'Camera ID', readonly: true },
+            { key: 'camera_location', label: 'Place of Violation', readonly: true },
+            { key: 'type', label: 'Violation Type', readonly: true },
+            { key: 'date', label: 'Date', readonly: true }
+        ], v, () => Modal.close());
+    } catch (err) {
+        showToast('Failed to load violation details', 'error');
+    }
+};
+
 window.deleteViolation = async function(id) {
-    if (!confirm('Delete this violation and its associated fine?')) return;
+    if (!confirm('Are you sure you want to cancel this violation? This will also remove any associated fines.')) return;
     await api(`/violations/${id}`, 'DELETE');
     renderViolations();
-    showToast('Violation deleted', 'info');
+    showToast('Violation cancelled');
 };
 
 document.getElementById('btn-add-violation').addEventListener('click', async () => {
@@ -1217,7 +1250,8 @@ async function renderFines(filter) {
         }
         tbody.innerHTML = fines.map(f => {
             const badgeClass = f.status === 'Paid' ? 'badge-success' : 'badge-danger';
-            const payBtn = f.status === 'Unpaid' ? `<button class="btn btn-sm btn-primary" onclick="payFine('${f.fine_id}')">Pay</button>` : '';
+            const payBtn = (isOwner && f.status === 'Unpaid') ? `<button class="btn btn-sm btn-primary" onclick="payFine('${f.fine_id}')">Pay</button>` : '';
+            const remindBtn = (!isOwner && f.status === 'Unpaid') ? `<button class="btn btn-sm btn-outline" onclick="sendFineReminder('${f.fine_id}')">Remind</button>` : '';
             return `<tr>
                 <td><strong>${f.fine_id}</strong></td>
                 <td>${f.violation_id}</td>
@@ -1225,7 +1259,7 @@ async function renderFines(filter) {
                 <td>${f.violation_type || '—'}</td>
                 <td>${formatCurrency(f.amount)}</td>
                 <td><span class="badge ${badgeClass}">${f.status}</span></td>
-                <td>${payBtn}</td>
+                <td>${isOwner ? payBtn : remindBtn}</td>
             </tr>`;
         }).join('');
     } catch (err) {
@@ -1236,6 +1270,10 @@ async function renderFines(filter) {
 document.getElementById('fine-status-filter').addEventListener('change', (e) => {
     renderFines(e.target.value);
 });
+
+window.sendFineReminder = function(fineId) {
+    showToast(`Reminder sent to owner for fine ${fineId}`, 'info');
+};
 
 window.payFine = function(fineId) {
     const paymentFields = [
