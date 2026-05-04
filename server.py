@@ -642,7 +642,7 @@ def create_violation():
     fine_amounts = {
         'Signal Jumping': 1000, 'Overspeeding': 2000, 'Helmetless Riding': 500,
         'Illegal Parking': 500, 'Lane Violation': 1000, 'Wrong Way Driving': 2000,
-        'Using Mobile Phone': 1500,
+        'Using Mobile Phone': 1500, 'Accident': 5000,
     }
     amount = fine_amounts.get(data['type'], 500)
 
@@ -774,7 +774,7 @@ def ai_detect():
     fine_amounts = {
         'Signal Jumping': 1000, 'Overspeeding': 2000, 'Helmetless Riding': 500,
         'Illegal Parking': 500, 'Lane Violation': 1000, 'Wrong Way Driving': 2000,
-        'Using Mobile Phone': 1500,
+        'Using Mobile Phone': 1500, 'Accident': 5000,
     }
     amount = fine_amounts.get(data['type'], 500)
 
@@ -961,7 +961,7 @@ def process_video_task(filename, camera_id):
             fine_amounts = {
                 'Signal Jumping': 1000, 'Overspeeding': 2000, 'Helmetless Riding': 500,
                 'Illegal Parking': 500, 'Lane Violation': 1000, 'Wrong Way Driving': 2000,
-                'Using Mobile Phone': 1500,
+                'Using Mobile Phone': 1500, 'Accident': 5000,
             }
             
             for det in detections:

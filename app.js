@@ -33,7 +33,7 @@ async function api(endpoint, method = 'GET', body = null) {
 const FINE_AMOUNTS = {
     'Signal Jumping': 1000, 'Overspeeding': 2000, 'Helmetless Riding': 500,
     'Illegal Parking': 500, 'Lane Violation': 1000, 'Wrong Way Driving': 2000,
-    'Using Mobile Phone': 1500,
+    'Using Mobile Phone': 1500, 'Accident': 5000,
 };
 const VIOLATION_TYPES = Object.keys(FINE_AMOUNTS);
 
@@ -759,6 +759,9 @@ async function renderDashboard() {
         // Chart
         renderViolationChart(stats.violationTypes || []);
 
+        // Accident alerts
+        renderAccidentAlerts();
+
         if (isAdmin) {
             AdminFineMap.scheduleInit();
         }
@@ -792,6 +795,29 @@ function renderViolationChart(typeCounts) {
             </div>
         </div>`;
     }).join('');
+}
+
+async function renderAccidentAlerts() {
+    try {
+        const violations = await api('/violations');
+        const accidents = violations.filter(v => v.type === 'Accident');
+        const reported = accidents.length;
+        const resolved = accidents.filter(v => v.fine_status === 'Paid').length;
+        const injuries = 0; // Placeholder, as no injury data
+
+        document.querySelector('.accident-value:nth-child(1)').textContent = reported;
+        document.querySelector('.accident-value:nth-child(2)').textContent = injuries;
+        document.querySelector('.accident-value:nth-child(3)').textContent = resolved;
+
+        const alertText = document.querySelector('.accident-alerts-card p');
+        if (reported > 0) {
+            alertText.textContent = `${reported} accident${reported > 1 ? 's' : ''} reported.`;
+        } else {
+            alertText.textContent = 'No accident reports are currently registered.';
+        }
+    } catch (err) {
+        console.error('Accident alerts error:', err);
+    }
 }
 
 // ============================================
