@@ -680,6 +680,8 @@ function applyDashboardMosaicLayout(isAdmin, stats) {
 // ============================================
 // DASHBOARD
 // ============================================
+let dashboardTabsInitialized = false;
+
 async function renderDashboard() {
     try {
         const stats = await api('/stats');
@@ -759,8 +761,18 @@ async function renderDashboard() {
         // Chart
         renderViolationChart(stats.violationTypes || []);
 
-        // Accident alerts
-        renderAccidentAlerts();
+        // Initialize dashboard violation tabs
+        if (!dashboardTabsInitialized) {
+            const tabs = document.querySelectorAll('#dashboard-violation-tabs .tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('#dashboard-violation-tabs .tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    renderViolationChart(stats.violationTypes || [], tab.dataset.type);
+                });
+            });
+            dashboardTabsInitialized = true;
+        }
 
         if (isAdmin) {
             AdminFineMap.scheduleInit();
@@ -771,21 +783,60 @@ async function renderDashboard() {
     }
 }
 
-function renderViolationChart(typeCounts) {
+function renderViolationChart(typeCounts, selectedType = 'all') {
     const chartArea = document.getElementById('violation-chart');
-    const max = Math.max(1, ...typeCounts.map(t => t.count));
+    if (selectedType === 'Accident') {
+        // Render accident alerts summary
+        (async () => {
+            try {
+                const violations = await api('/violations');
+                const accidents = violations.filter(v => v.type === 'Accident');
+                const reported = accidents.length;
+                const resolved = accidents.filter(v => v.fine_status === 'Paid').length;
+                const injuries = 0; // Placeholder
+                const html = `
+                    <p class="text-muted" style="margin: 0 0 1rem;">${reported} accident${reported > 1 ? 's' : ''} reported.</p>
+                    <div class="accident-summary-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem;">
+                        <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                            <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">${reported}</div>
+                            <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Reported</div>
+                        </div>
+                        <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                            <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">${injuries}</div>
+                            <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Injuries</div>
+                        </div>
+                        <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                            <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">${resolved}</div>
+                            <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Resolved</div>
+                        </div>
+                    </div>
+                `;
+                chartArea.innerHTML = html;
+            } catch (err) {
+                chartArea.innerHTML = '<div class="empty-state small"><p>Error loading accident alerts</p></div>';
+            }
+        })();
+        return;
+    }
+
+    let filteredCounts = typeCounts;
+    if (selectedType !== 'all') {
+        filteredCounts = typeCounts.filter(t => t.type === selectedType);
+    }
+
+    const max = Math.max(1, ...filteredCounts.map(t => t.count));
     const classMap = {
         'Signal Jumping': 'signal', 'Overspeeding': 'speed', 'Helmetless Riding': 'helmet',
         'Illegal Parking': 'parking', 'Lane Violation': 'lane', 'Wrong Way Driving': 'signal',
         'Using Mobile Phone': 'speed', 'Accident': 'parking'
     };
 
-    if (typeCounts.length === 0) {
+    if (filteredCounts.length === 0) {
         chartArea.innerHTML = '<div class="empty-state small"><p>No data yet</p></div>';
         return;
     }
 
-    chartArea.innerHTML = typeCounts.map(({ type, count }) => {
+    chartArea.innerHTML = filteredCounts.map(({ type, count }) => {
         const pct = (count / max * 100).toFixed(0);
         const cls = classMap[type] || 'signal';
         return `<div class="chart-bar-group">

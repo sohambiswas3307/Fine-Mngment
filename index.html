@@ -240,29 +240,18 @@
                     <div class="card-header">
                         <h2>Violation Types</h2>
                     </div>
+                    <div class="tabs" id="dashboard-violation-tabs">
+                        <button class="tab active" data-type="all">All</button>
+                        <button class="tab" data-type="Signal Jumping">Signal Jumping</button>
+                        <button class="tab" data-type="Overspeeding">Overspeeding</button>
+                        <button class="tab" data-type="Helmetless Riding">Helmetless Riding</button>
+                        <button class="tab" data-type="Illegal Parking">Illegal Parking</button>
+                        <button class="tab" data-type="Lane Violation">Lane Violation</button>
+                        <button class="tab" data-type="Wrong Way Driving">Wrong Way Driving</button>
+                        <button class="tab" data-type="Using Mobile Phone">Using Mobile Phone</button>
+                        <button class="tab" data-type="Accident">Accident Alerts</button>
+                    </div>
                     <div class="chart-area" id="violation-chart"></div>
-                </div>
-                <div class="card accident-alerts-card">
-                    <div class="card-header">
-                        <h2>Accident Alerts</h2>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted" style="margin: 0 0 1rem;">No accident reports are currently registered.</p>
-                        <div class="accident-summary-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem;">
-                            <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                                <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">0</div>
-                                <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Reported</div>
-                            </div>
-                            <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                                <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">0</div>
-                                <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Injuries</div>
-                            </div>
-                            <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
-                                <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">0</div>
-                                <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Resolved</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 <div class="mosaic-pair">
                     <div class="mosaic-card mosaic-spot">
