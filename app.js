@@ -1028,15 +1028,23 @@ document.getElementById('btn-add-vehicle').addEventListener('click', async () =>
 // ============================================
 // VIOLATIONS
 // ============================================
-async function renderViolations() {
+let currentViolationFilter = 'all';
+let tabsInitialized = false;
+
+async function renderViolations(typeFilter = currentViolationFilter) {
+    currentViolationFilter = typeFilter;
     try {
         const violations = await api('/violations');
+        let filtered = violations;
+        if (typeFilter !== 'all') {
+            filtered = violations.filter(v => v.type === typeFilter);
+        }
         const tbody = document.getElementById('violations-body');
-        if (violations.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="empty-state small"><p>No violations recorded</p></td></tr>';
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state small"><p>No violations found</p></td></tr>';
             return;
         }
-        tbody.innerHTML = violations.map(v => {
+        tbody.innerHTML = filtered.map(v => {
             const badgeClass = v.fine_status === 'Paid' ? 'badge-success' : 'badge-danger';
             return `<tr>
                 <td><strong>${v.violation_id}</strong></td>
@@ -1050,6 +1058,19 @@ async function renderViolations() {
                 </td>
             </tr>`;
         }).join('');
+
+        // Initialize tabs
+        if (!tabsInitialized) {
+            const tabs = document.querySelectorAll('#violation-tabs .tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('#violation-tabs .tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    renderViolations(tab.dataset.type);
+                });
+            });
+            tabsInitialized = true;
+        }
     } catch (err) {
         showToast('Failed to load violations', 'error');
     }

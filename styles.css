@@ -1365,6 +1365,38 @@ h1, h2, h3, .logo-title, .stat-value, .page-title, .mosaic-spot-title, .sidebar-
     text-decoration: underline;
 }
 
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-main);
+    padding-bottom: 8px;
+}
+
+.tab {
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: 1px solid var(--border-main);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.tab.active {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
+.tab:hover {
+    background: var(--bg-card);
+    color: var(--text-main);
+}
+
 /* Modals */
 .modal-overlay {
     position: fixed;
