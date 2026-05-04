@@ -777,7 +777,7 @@ function renderViolationChart(typeCounts) {
     const classMap = {
         'Signal Jumping': 'signal', 'Overspeeding': 'speed', 'Helmetless Riding': 'helmet',
         'Illegal Parking': 'parking', 'Lane Violation': 'lane', 'Wrong Way Driving': 'signal',
-        'Using Mobile Phone': 'speed'
+        'Using Mobile Phone': 'speed', 'Accident': 'parking'
     };
 
     if (typeCounts.length === 0) {
