@@ -404,6 +404,17 @@ h1, h2, h3, .logo-title, .stat-value, .page-title, .mosaic-spot-title, .sidebar-
     overflow: hidden;
 }
 
+.login-card .logo-icon {
+    width: 80px;
+    height: 80px;
+}
+
+.login-card .logo-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .logo-title {
     font-family: 'Poppins', sans-serif;
     font-size: 1.5rem;

@@ -17,7 +17,7 @@
         <div class="login-card">
             <div class="logo" style="margin-bottom: 24px; justify-content: center;">
                 <div class="logo-icon">
-                    <img src="logo.png" alt="E Parivahan Logo" style="width: 48px; height: 48px; border-radius: 12px; object-fit: cover;">
+                    <img src="logo.png" alt="E Parivahan Logo" style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover;">
                 </div>
                 <div class="logo-text">
                     <span class="logo-title">E Parivahan</span>
@@ -134,45 +134,16 @@
         <section class="page active" id="page-dashboard">
             <div class="dashboard-mosaic">
                 <div class="dashboard-mosaic-mid">
-                    <div class="mosaic-card mosaic-revenue">
-                        <div class="mosaic-revenue-icon" aria-hidden="true">
-                            <svg class="icon-rupee icon-rupee--lg" width="22" height="22" viewBox="0 0 24 24"><text x="12" y="17.5" font-size="16" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
-                        </div>
-                        <div class="mosaic-revenue-body">
-                            <span class="mosaic-revenue-label" id="stat-fines-collected-label">Fines collected</span>
-                            <span class="mosaic-revenue-value" id="stat-fines-collected">₹0</span>
-                            <div class="mosaic-progress-track">
-                                <div class="mosaic-progress-fill" id="dashboard-collection-bar" style="width: 0%"></div>
+                    <div class="mosaic-card mosaic-map-card dashboard-admin-only hidden" id="admin-fine-map-card">
+                        <div class="mosaic-calendar-head mosaic-map-head">
+                            <span class="mosaic-calendar-title">City fine &amp; traffic hotspots</span>
+                            <div class="map-head-meta">
+                                <span class="map-live-badge"><span class="pulse-indicator pulse-indicator--sm"></span> Live</span>
+                                <span class="map-updated" id="admin-map-updated"></span>
                             </div>
                         </div>
-                    </div>
-                    <div class="mosaic-pair">
-                        <div class="mosaic-card mosaic-spot">
-                            <h3 class="mosaic-spot-title" id="mosaic-dash-left-title">Registered owners</h3>
-                            <p class="mosaic-spot-sub" id="mosaic-dash-left-sub">In the system</p>
-                            <div class="mosaic-avatars" id="mosaic-dash-left-avatars" aria-hidden="true">
-                                <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
-                            </div>
-                            <div class="mosaic-tags" id="mosaic-dash-left-tags">
-                                <span class="mosaic-tag mosaic-tag--purple">People</span>
-                                <span class="mosaic-tag">KYC</span>
-                                <span class="mosaic-tag mosaic-tag--purple">ID</span>
-                            </div>
-                            <p class="mosaic-spot-metric"><span id="stat-cameras">0</span> <span id="mosaic-dash-left-suffix">owners</span></p>
-                        </div>
-                        <div class="mosaic-card mosaic-spot">
-                            <h3 class="mosaic-spot-title" id="mosaic-dash-right-title">Registered vehicles</h3>
-                            <p class="mosaic-spot-sub" id="mosaic-dash-right-sub">Linked to owners</p>
-                            <div class="mosaic-avatars" id="mosaic-dash-right-avatars" aria-hidden="true">
-                                <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
-                            </div>
-                            <div class="mosaic-tags" id="mosaic-dash-right-tags">
-                                <span class="mosaic-tag mosaic-tag--purple">RC</span>
-                                <span class="mosaic-tag">Fleet</span>
-                                <span class="mosaic-tag mosaic-tag--purple">Reg</span>
-                            </div>
-                            <p class="mosaic-spot-metric"><span id="stat-violations">0</span> <span id="mosaic-dash-right-suffix">vehicles</span></p>
-                        </div>
+                        <p class="mosaic-map-lead">OpenStreetMap base with heat by violation volume. Larger rings mark cameras where more fines are raised.</p>
+                        <div id="leaflet-fine-map" class="leaflet-fine-map" role="region" aria-label="City map"></div>
                     </div>
                     <div class="mosaic-card mosaic-reminders dashboard-user-only" id="daily-reminders-card">
                         <div class="mosaic-calendar-head">
@@ -186,27 +157,8 @@
                         </div>
                         <ul class="reminders-list" id="reminders-list"></ul>
                     </div>
-                    <div class="mosaic-card mosaic-map-card dashboard-admin-only hidden" id="admin-fine-map-card">
-                        <div class="mosaic-calendar-head mosaic-map-head">
-                            <span class="mosaic-calendar-title">City fine &amp; traffic hotspots</span>
-                            <div class="map-head-meta">
-                                <span class="map-live-badge"><span class="pulse-indicator pulse-indicator--sm"></span> Live</span>
-                                <span class="map-updated" id="admin-map-updated"></span>
-                            </div>
-                        </div>
-                        <p class="mosaic-map-lead">OpenStreetMap base with heat by violation volume. Larger rings mark cameras where more fines are raised.</p>
-                        <div id="leaflet-fine-map" class="leaflet-fine-map" role="region" aria-label="City map"></div>
-                    </div>
                 </div>
                 <div class="dashboard-mosaic-right">
-                    <div class="mosaic-welcome">
-                        <div class="mosaic-welcome-blob" aria-hidden="true"></div>
-                        <div class="mosaic-welcome-text">
-                            <span class="mosaic-welcome-kicker">Operations</span>
-                            <p class="mosaic-welcome-line">Monitor violations, fines, and camera health in one place.</p>
-                        </div>
-                        <span class="mosaic-welcome-chevron" aria-hidden="true">⌄</span>
-                    </div>
                     <div class="mosaic-card mosaic-balance dashboard-user-only">
                         <div class="mosaic-balance-top">
                             <div>
@@ -243,19 +195,23 @@
                                     <span class="mosaic-donut-value" id="dashboard-donut-label">0%</span>
                                 </div>
                             </div>
-                            <p class="mosaic-donut-caption" id="dashboard-donut-caption">Collection progress</p>
+                            <div class="mosaic-donut-legend">
+                                <p class="mosaic-donut-legend-item"><span class="mosaic-donut-legend-dot" style="background: var(--brand-primary); width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>Collected fines</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="page-header page-header--compact">
-                <div>
-                    <h1 class="page-title">Dashboard</h1>
-                    <p class="page-subtitle">Real-time traffic monitoring overview</p>
-                </div>
-                <div class="header-actions">
-                    <span class="pulse-indicator"></span>
-                    <span class="live-label">LIVE</span>
+                    <div class="mosaic-card mosaic-revenue">
+                        <div class="mosaic-revenue-icon" aria-hidden="true">
+                            <svg class="icon-rupee icon-rupee--lg" width="22" height="22" viewBox="0 0 24 24"><text x="12" y="17.5" font-size="16" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
+                        </div>
+                        <div class="mosaic-revenue-body">
+                            <span class="mosaic-revenue-label" id="stat-fines-collected-label">Fines collected</span>
+                            <span class="mosaic-revenue-value" id="stat-fines-collected">₹0</span>
+                            <div class="mosaic-progress-track">
+                                <div class="mosaic-progress-fill" id="dashboard-collection-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="dashboard-grid">
@@ -285,6 +241,56 @@
                         <h2>Violation Types</h2>
                     </div>
                     <div class="chart-area" id="violation-chart"></div>
+                </div>
+                <div class="card accident-alerts-card">
+                    <div class="card-header">
+                        <h2>Accident Alerts</h2>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted" style="margin: 0 0 1rem;">No accident reports are currently registered.</p>
+                        <div class="accident-summary-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem;">
+                            <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                                <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">0</div>
+                                <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Reported</div>
+                            </div>
+                            <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                                <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">0</div>
+                                <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Injuries</div>
+                            </div>
+                            <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                                <div class="accident-value" style="font-size: 1.75rem; font-weight: 700;">0</div>
+                                <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Resolved</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mosaic-pair">
+                    <div class="mosaic-card mosaic-spot">
+                        <h3 class="mosaic-spot-title" id="mosaic-dash-left-title">Registered owners</h3>
+                        <p class="mosaic-spot-sub" id="mosaic-dash-left-sub">In the system</p>
+                        <div class="mosaic-avatars" id="mosaic-dash-left-avatars" aria-hidden="true">
+                            <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
+                        </div>
+                        <div class="mosaic-tags" id="mosaic-dash-left-tags">
+                            <span class="mosaic-tag mosaic-tag--purple">People</span>
+                            <span class="mosaic-tag">KYC</span>
+                            <span class="mosaic-tag mosaic-tag--purple">ID</span>
+                        </div>
+                        <p class="mosaic-spot-metric"><span id="stat-cameras">0</span> <span id="mosaic-dash-left-suffix">owners</span></p>
+                    </div>
+                    <div class="mosaic-card mosaic-spot">
+                        <h3 class="mosaic-spot-title" id="mosaic-dash-right-title">Registered vehicles</h3>
+                        <p class="mosaic-spot-sub" id="mosaic-dash-right-sub">Linked to owners</p>
+                        <div class="mosaic-avatars" id="mosaic-dash-right-avatars" aria-hidden="true">
+                            <span class="mosaic-avatar"></span><span class="mosaic-avatar"></span><span class="mosaic-avatar"></span>
+                        </div>
+                        <div class="mosaic-tags" id="mosaic-dash-right-tags">
+                            <span class="mosaic-tag mosaic-tag--purple">RC</span>
+                            <span class="mosaic-tag">Fleet</span>
+                            <span class="mosaic-tag mosaic-tag--purple">Reg</span>
+                        </div>
+                        <p class="mosaic-spot-metric"><span id="stat-violations">0</span> <span id="mosaic-dash-right-suffix">vehicles</span></p>
+                    </div>
                 </div>
             </div>
         </section>
