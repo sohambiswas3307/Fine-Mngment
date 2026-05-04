@@ -103,6 +103,10 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 <span>Violations</span>
             </a>
+            <a href="#accident-alerts" class="nav-item" data-page="accident-alerts" id="nav-accident-alerts">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><circle cx="12" cy="17" r="1"/><path d="M12 13V9"/></svg>
+                <span>Accident Alerts</span>
+            </a>
             <a href="#fines" class="nav-item" data-page="fines" id="nav-fines">
                 <svg class="icon-rupee" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17" font-size="15" font-family="Poppins, system-ui, sans-serif" font-weight="700" fill="currentColor" text-anchor="middle">₹</text></svg>
                 <span>Fines</span>
@@ -239,17 +243,6 @@
                 <div class="card violation-chart-card">
                     <div class="card-header">
                         <h2>Violation Types</h2>
-                    </div>
-                    <div class="tabs" id="dashboard-violation-tabs">
-                        <button class="tab active" data-type="all">All</button>
-                        <button class="tab" data-type="Signal Jumping">Signal Jumping</button>
-                        <button class="tab" data-type="Overspeeding">Overspeeding</button>
-                        <button class="tab" data-type="Helmetless Riding">Helmetless Riding</button>
-                        <button class="tab" data-type="Illegal Parking">Illegal Parking</button>
-                        <button class="tab" data-type="Lane Violation">Lane Violation</button>
-                        <button class="tab" data-type="Wrong Way Driving">Wrong Way Driving</button>
-                        <button class="tab" data-type="Using Mobile Phone">Using Mobile Phone</button>
-                        <button class="tab" data-type="Accident">Accident Alerts</button>
                     </div>
                     <div class="chart-area" id="violation-chart"></div>
                 </div>
@@ -492,6 +485,47 @@
                             </tr>
                         </thead>
                         <tbody id="violations-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== ACCIDENT ALERTS PAGE ===== -->
+        <section class="page" id="page-accident-alerts">
+            <div class="page-header">
+                <div>
+                    <h1>Accident Alerts</h1>
+                    <p class="page-subtitle">Monitor and manage accident reports</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="accident-summary-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                        <div class="accident-value" id="accident-reported" style="font-size: 1.75rem; font-weight: 700;">0</div>
+                        <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Reported</div>
+                    </div>
+                    <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                        <div class="accident-value" id="accident-injuries" style="font-size: 1.75rem; font-weight: 700;">0</div>
+                        <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Injuries</div>
+                    </div>
+                    <div class="accident-metric" style="padding: 1rem; background: var(--bg-card); border-radius: 16px; text-align: center;">
+                        <div class="accident-value" id="accident-resolved" style="font-size: 1.75rem; font-weight: 700;">0</div>
+                        <div class="accident-label" style="color: var(--text-muted); margin-top: 0.5rem;">Resolved</div>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table" id="accident-alerts-table">
+                        <thead>
+                            <tr>
+                                <th>Violation ID</th>
+                                <th>Vehicle</th>
+                                <th>Camera</th>
+                                <th>Date</th>
+                                <th>Fine Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accident-alerts-body"></tbody>
                     </table>
                 </div>
             </div>

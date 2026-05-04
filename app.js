@@ -609,6 +609,7 @@ function renderPage(page) {
         case 'owners': renderOwners(); break;
         case 'vehicles': renderVehicles(); break;
         case 'violations': renderViolations(); break;
+        case 'accident-alerts': renderAccidentAlertsPage(); break;
         case 'fines': renderFines(); break;
         case 'payments': renderPayments(); break;
     }
@@ -761,19 +762,6 @@ async function renderDashboard() {
         // Chart
         renderViolationChart(stats.violationTypes || []);
 
-        // Initialize dashboard violation tabs
-        if (!dashboardTabsInitialized) {
-            const tabs = document.querySelectorAll('#dashboard-violation-tabs .tab');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('#dashboard-violation-tabs .tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    renderViolationChart(stats.violationTypes || [], tab.dataset.type);
-                });
-            });
-            dashboardTabsInitialized = true;
-        }
-
         if (isAdmin) {
             AdminFineMap.scheduleInit();
         }
@@ -868,6 +856,42 @@ async function renderAccidentAlerts() {
         }
     } catch (err) {
         console.error('Accident alerts error:', err);
+    }
+}
+
+async function renderAccidentAlertsPage() {
+    try {
+        const violations = await api('/violations');
+        const accidents = violations.filter(v => v.type === 'Accident');
+        const reported = accidents.length;
+        const resolved = accidents.filter(v => v.fine_status === 'Paid').length;
+        const injuries = 0; // Placeholder
+
+        document.getElementById('accident-reported').textContent = reported;
+        document.getElementById('accident-injuries').textContent = injuries;
+        document.getElementById('accident-resolved').textContent = resolved;
+
+        const tbody = document.getElementById('accident-alerts-body');
+        if (accidents.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state small"><p>No accident alerts recorded</p></td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = accidents.map(v => {
+            const badgeClass = v.fine_status === 'Paid' ? 'badge-success' : 'badge-danger';
+            return `<tr>
+                <td><strong>${v.violation_id}</strong></td>
+                <td>${v.vehicle_reg || v.vehicle_id}</td>
+                <td>${v.camera_location || v.camera_id}</td>
+                <td>${v.date}</td>
+                <td><span class="badge ${badgeClass}">${v.fine_status}</span></td>
+                <td>
+                    <button class="btn-icon delete" onclick="deleteViolation('${v.violation_id}')" title="Delete">✕</button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch (err) {
+        showToast('Failed to load accident alerts', 'error');
     }
 }
 
